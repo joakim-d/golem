@@ -1,4 +1,4 @@
-#include <gui/widgets/Widget.h>
+#include <graphics/Widget.h>
 
 #include <ecs/EntityManager.h>
 
@@ -8,7 +8,7 @@
 #include <ecs/components/PositionComponent.h>
 #include <ecs/components/SizeComponent.h>
 
-namespace gui::widgets {
+namespace graphics {
 
 Widget::Widget(ecs::Entity entity, ecs::EntityManager& manager)
     : entity(entity)
@@ -22,7 +22,8 @@ Widget Widget::createEntity(
 {
     auto entity = manager.addEntity(name);
     Widget widget { *entity, manager };
-    widget.addPosition(0, 0);
+    widget.addPosition(0, 0)
+        .addSize(0, 0);
     return widget;
 }
 
@@ -30,7 +31,7 @@ Widget& Widget::addPosition(int x, int y)
 {
     m_manager.addComponent<ecs::Position>(
         entity,
-        ecs::Position { 0, 0 });
+        ecs::Position { x, y });
 
     return *this;
 }
@@ -44,12 +45,72 @@ Widget& Widget::addFill(graphics::core::Color color)
     return *this;
 }
 
-Widget& addBorder(int size, SDL_Color color);
+Widget& Widget::addBorder(int size, graphics::core::Color color)
+{
+    m_manager.addComponent<ecs::Border>(
+        entity,
+        ecs::Border { size, SDL_Color { color.r, color.g, color.b, color.a } });
+
+    return *this;
+}
+
 Widget& Widget::addSize(int width, int height)
 {
     m_manager.addComponent<ecs::Size>(
         entity,
         ecs::Size { width, height });
+
+    return *this;
+}
+
+Widget& Widget::addZPosition(int z)
+{
+    m_manager.addComponent<ecs::ZPosition>(
+        entity,
+        ecs::ZPosition { z });
+
+    return *this;
+}
+
+Widget& Widget::onPressed(
+    ecs::Button accepted_buttons,
+    std::function<void(ecs::Button)> callback)
+{
+    m_manager.addComponent<ecs::OnPressed>(
+        entity,
+        ecs::OnPressed { accepted_buttons, std::move(callback) });
+
+    return *this;
+}
+
+Widget& Widget::onReleased(
+    ecs::Button accepted_buttons,
+    std::function<void(ecs::Button)> callback)
+{
+    m_manager.addComponent<ecs::OnReleased>(
+        entity,
+        ecs::OnReleased { accepted_buttons, std::move(callback) });
+
+    return *this;
+}
+
+Widget& Widget::onClicked(
+    ecs::Button accepted_buttons,
+    std::function<void(ecs::Button)> callback)
+{
+    m_manager.addComponent<ecs::OnClicked>(
+        entity,
+        ecs::OnClicked { accepted_buttons, std::move(callback) });
+
+    return *this;
+}
+
+Widget& Widget::onPositionChanged(
+    std::function<void(int x, int y)> callback)
+{
+    m_manager.addComponent<ecs::onPositionChanged>(
+        entity,
+        ecs::onPositionChanged { std::move(callback) });
 
     return *this;
 }
@@ -109,6 +170,37 @@ Widget& Widget::addTexture(graphics::Texture texture)
         ecs::Texture { texture });
 
     return *this;
+}
+
+int Widget::width() const
+{
+    return m_manager
+        .getComponent<ecs::Size>(
+            entity)
+        .w;
+}
+
+int Widget::height() const
+{
+    return m_manager
+        .getComponent<ecs::Size>(
+            entity)
+        .h;
+}
+int Widget::x() const
+{
+    return m_manager
+        .getComponent<ecs::Position>(
+            entity)
+        .x;
+}
+
+int Widget::y() const
+{
+    return m_manager
+        .getComponent<ecs::Position>(
+            entity)
+        .y;
 }
 
 }

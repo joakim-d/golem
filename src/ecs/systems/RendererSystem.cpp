@@ -28,7 +28,7 @@ static void renderTexture(
 
 Renderer::Renderer(
     SDL_Renderer* renderer,
-    graphics::TextureManager& texture_manager)
+    const graphics::TextureManager& texture_manager)
     : m_renderer(renderer)
     , m_texture_manager(texture_manager)
 {
@@ -46,7 +46,30 @@ void Renderer::update(
     SDL_SetRenderDrawColor(m_renderer, 0, 0, 0, 255);
     SDL_RenderClear(m_renderer);
 
-    for (auto entity : entities) {
+    // Sort entities by Z position
+    auto sortedByZEntities = entities;
+    std::sort(
+        sortedByZEntities.begin(),
+        sortedByZEntities.end(),
+        [&pool](Entity left, Entity right) {
+            int z_left
+                = pool.hasComponent<ZPositionComponent>(left)
+                ? pool.getComponent<ZPosition>(left).z
+                : 0;
+
+            int z_right
+                = pool.hasComponent<ZPositionComponent>(right)
+                ? pool.getComponent<ZPosition>(right).z
+                : 0;
+
+            if (z_left == z_right) {
+                return left < right;
+            }
+
+            return z_left < z_right;
+        });
+
+    for (auto entity : sortedByZEntities) {
         if (!pool.hasComponent<PositionComponent>(entity))
             continue;
         if (!pool.hasComponent<SizeComponent>(entity))
@@ -75,6 +98,28 @@ void Renderer::update(
                 m_renderer,
                 &rectangle);
         }
+
+        if (pool.hasComponent<BorderComponent>(entity)) {
+            const auto& border = pool.getComponent<Border>(entity);
+            SDL_SetRenderDrawColor(
+                m_renderer,
+                border.colour.r,
+                border.colour.g,
+                border.colour.b,
+                border.colour.a);
+
+            SDL_Rect rectangle {
+                position.x,
+                position.y,
+                size.w,
+                size.h
+            };
+
+            SDL_RenderDrawRect(
+                m_renderer,
+                &rectangle);
+        }
+
         if (pool.hasComponent<TextureComponent>(entity)) {
             const auto& texture_component = pool.getComponent<Texture>(entity);
             auto texture = m_texture_manager.getTexture(texture_component.id);

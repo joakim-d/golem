@@ -29,6 +29,12 @@ public:
         return m_memory_pool.hasComponent<Component<ComponentData>>(entity);
     }
 
+    template <typename ComponentData>
+    const ComponentData& getComponent(Entity entity) const
+    {
+        return m_memory_pool.getComponent<ComponentData>(entity);
+    }
+
 private:
     EntityMemoryPool& m_memory_pool;
     std::vector<Entity> m_entities;

@@ -2,10 +2,10 @@
 
 #include <graphics/FontManager.h>
 #include <graphics/TextureManager.h>
+#include <graphics/Widget.h>
 
 #include <ecs/EntityManager.h>
 #include <ecs/components/TextureComponent.h>
-#include <gui/widgets/Widget.h>
 
 #include <iostream>
 
@@ -23,7 +23,7 @@ LabelFactory::LabelFactory(
 {
 }
 
-ecs::Entity LabelFactory::createLabel(
+std::optional<Widget> LabelFactory::createLabel(
     const std::string& text,
     const std::filesystem::path& font_path,
     size_t point_size,
@@ -33,7 +33,7 @@ ecs::Entity LabelFactory::createLabel(
     if (!font_id.has_value()) {
         std::cerr << "Failed to open font " << font_path << std::endl;
         SDL_Quit();
-        return 0;
+        return {};
     }
 
     auto font = m_font_manager.getFont(*font_id);
@@ -57,12 +57,12 @@ ecs::Entity LabelFactory::createLabel(
         &height);
 
     auto entity
-        = gui::widgets::Widget::createEntity("label", m_entity_manager)
+        = graphics::Widget::createEntity("label", m_entity_manager)
               .addSize(width, height)
               .addPosition(0, 0)
               .addTexture(texture);
 
-    return entity.entity;
+    return entity;
 }
 
 }

@@ -1,11 +1,10 @@
 #pragma once
 
-#include <ecs/Entity.h>
-#include <ecs/components/TextureComponent.h>
-
+#include <graphics/Widget.h>
 #include <graphics/core/Color.h>
 
 #include <filesystem>
+#include <optional>
 
 namespace ecs {
 class EntityManager;
@@ -23,7 +22,7 @@ public:
         TextureManager& texture_manager,
         ecs::EntityManager& entity_manager);
 
-    ecs::Entity createLabel(
+    std::optional<Widget> createLabel(
         const std::string& text,
         const std::filesystem::path& font_path,
         size_t point_size,

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(sdl_ecs LANGUAGES CXX)
+project(golem LANGUAGES CXX)
+
+option(ENABLE_ASAN "Enable address sanitizer" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,19 +15,24 @@ find_package(SDL2_ttf REQUIRED)
 
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.h")
 
+if(ENABLE_ASAN)
+    add_compile_options("-fsanitize=address")
+    add_link_options("-fsanitize=address")
+endif()
+
 add_executable(
-    sdl_ecs
+    golem
     ${SOURCES}
 )
 
 target_include_directories(
-    sdl_ecs
+    golem
     PRIVATE
     src
 )
 
 target_link_libraries(
-    sdl_ecs
+    golem
     PRIVATE
     SDL2::Main
     SDL2::Image
@@ -33,7 +40,7 @@ target_link_libraries(
 )
 
 include(GNUInstallDirs)
-install(TARGETS sdl_ecs
+install(TARGETS golem
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

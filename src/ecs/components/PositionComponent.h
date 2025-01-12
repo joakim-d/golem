@@ -9,6 +9,11 @@ struct Position {
     int y;
 };
 
+struct ZPosition {
+    int z;
+};
+
 using PositionComponent = Component<Position>;
+using ZPositionComponent = Component<ZPosition>;
 
 }

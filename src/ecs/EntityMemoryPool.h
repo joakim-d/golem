@@ -26,9 +26,14 @@ using ComponentVectorTuple = std::tuple<
     std::vector<AnchorBottomComponent>,
     std::vector<BorderComponent>,
     std::vector<FillComponent>,
+    std::vector<OnClickedComponent>,
+    std::vector<onPositionChangedComponent>,
+    std::vector<OnPressedComponent>,
+    std::vector<OnReleasedComponent>,
     std::vector<TextureComponent>,
     std::vector<PositionComponent>,
-    std::vector<SizeComponent>>;
+    std::vector<SizeComponent>,
+    std::vector<ZPositionComponent>>;
 
 class EntityMemoryPool {
 public:
@@ -49,6 +54,12 @@ public:
 
     template <typename ComponentData>
     ComponentData& getComponent(Entity entity)
+    {
+        return std::get<std::vector<Component<ComponentData>>>(m_pool)[entity].data;
+    }
+
+    template <typename ComponentData>
+    const ComponentData& getComponent(Entity entity) const
     {
         return std::get<std::vector<Component<ComponentData>>>(m_pool)[entity].data;
     }

@@ -2,8 +2,8 @@
 
 #include <ecs/Entity.h>
 
-namespace ecs {
-class EntityManager;
+namespace graphics {
+class GraphicsFactory;
 }
 
 namespace gui {
@@ -11,7 +11,7 @@ namespace gui {
 class MenuBar {
 public:
     MenuBar(
-        ecs::EntityManager& entity_manager,
+        graphics::GraphicsFactory& entity_manager,
         ecs::Entity entity);
 };
 

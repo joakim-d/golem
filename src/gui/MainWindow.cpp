@@ -1,11 +1,14 @@
 #include <gui/MainWindow.h>
 
 #include <gui/MenuBar.h>
+#include <gui/style/Style.h>
+#include <gui/views/SequencerView.h>
 #include <gui/views/SongView.h>
-#include <gui/widgets/Widget.h>
 
 #include <graphics/FontManager.h>
+#include <graphics/GraphicsFactory.h>
 #include <graphics/LabelFactory.h>
+#include <graphics/Widget.h>
 
 #include <ecs/EntityManager.h>
 #include <ecs/EntityMemoryPool.h>
@@ -60,70 +63,68 @@ int MainWindow::execute()
 
     ecs::EntityManager manager { pool };
 
-    auto screen_entity = manager.addEntity("window");
+    auto renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
 
-    pool.addComponent(
-        *screen_entity,
-        ecs::Position { 0, 0 });
+    graphics::GraphicsFactory graphics_factory { renderer, manager };
 
-    pool.addComponent(
-        *screen_entity,
-        ecs::Size {
-            0,
-            0 });
+    // Create window widget
+    auto window_widget
+        = graphics_factory
+              .createWidget("window")
+              .addSize(800, 0);
 
-    pool.addComponent(
-        *screen_entity,
-        ecs::Fill {
-            SDL_Color { 0, 0, 0, 255 } });
+    const auto window_entity = window_widget.entity;
 
     auto menu_bar_widget
-        = gui::widgets::Widget::
-              createEntity("menu_bar", manager)
-                  .addSize(0, 32)
-                  .anchorLeft(*screen_entity, ecs::Left)
-                  .anchorRight(*screen_entity, ecs::Right)
-                  .anchorTop(*screen_entity, ecs::Top)
-                  .addFill(graphics::core::Color::fromHexa("#333333"));
+        = graphics_factory.createWidget("menu_bar")
+              .addSize(0, 32)
+              .anchorLeft(window_entity, ecs::Left)
+              .anchorRight(window_entity, ecs::Right)
+              .anchorTop(window_entity, ecs::Top)
+              .addFill(graphics::core::Color::fromHexa("#333333"));
 
-    gui::MenuBar menu_bar(manager, menu_bar_widget.entity);
+    gui::MenuBar menu_bar(graphics_factory, menu_bar_widget.entity);
 
     auto song_view_widget
-        = gui::widgets::Widget::
-              createEntity("song_view", manager)
-                  .addSize(0, 16)
-                  .anchorLeft(*screen_entity, ecs::Left)
-                  .anchorRight(*screen_entity, ecs::Right)
-                  .anchorTop(menu_bar_widget.entity, ecs::Bottom);
+        = graphics_factory.createWidget("song_view")
+              .addSize(0, 48 * 4 + 16 + 4) // 48 pixels per track + 16 pixels for header + 4 pixels for spacing
+              .anchorLeft(window_entity, ecs::Left)
+              .anchorRight(window_entity, ecs::Right)
+              .anchorTop(menu_bar_widget.entity, ecs::Bottom);
 
-    gui::views::SongView { manager, song_view_widget.entity };
+    gui::views::SongView { graphics_factory, song_view_widget.entity };
+
+    auto sequencer_widget
+        = graphics_factory.createWidget("sequencer_view")
+              .addSize(window_widget.width(), 0)
+              .anchorTop(song_view_widget.entity, ecs::Bottom)
+              //.anchorLeft(window_entity, ecs::Left)
+              //.anchorRight(window_entity, ecs::Right)
+              .anchorBottom(window_entity, ecs::Bottom);
+
+    gui::views::SequencerView sequencer_view {
+        graphics_factory,
+        sequencer_widget
+    };
 
     ecs::SystemFactory factory { pool, manager };
 
     int window_width;
     int window_height;
+
     SDL_GetWindowSize(m_window, &window_width, &window_height);
-
-    auto renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
-
-    graphics::FontManager font_manager;
-    graphics::TextureManager texture_manager { renderer };
-
-    graphics::LabelFactory label_factory { font_manager, texture_manager, manager };
-
-    auto label_entity = label_factory.createLabel(
-        "TESSSSSSSSSSSSSSSSSSSSSST",
-        "/home/joachim/.local/share/fonts/JetBrainsMono-Regular.ttf",
-        48,
-        graphics::core::Color::fromHexa("#0000ff"));
 
     auto user_input_system = factory.createSystem<ecs::UserInputSystem>(
         window_width,
         window_height);
 
     auto updater_system = factory.createSystem<ecs::Updater>();
+
     auto anchoring_system = factory.createSystem<ecs::AnchoringSystem>();
-    auto renderer_system = factory.createSystem<ecs::Renderer>(renderer, texture_manager);
+
+    auto renderer_system = factory.createSystem<ecs::Renderer>(
+        renderer,
+        graphics_factory.textureManager());
 
     while (!SDL_QuitRequested()) {
         user_input_system.update();

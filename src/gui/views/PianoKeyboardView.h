@@ -4,15 +4,20 @@
 
 namespace graphics {
 class GraphicsFactory;
+class Widget;
 }
 
 namespace gui::views {
 
-class SongView {
+class PianoKeyboardView {
 public:
-    SongView(
+    PianoKeyboardView(
         graphics::GraphicsFactory& graphics_factory,
-        ecs::Entity song_view_entity);
+        const graphics::Widget& view_widget,
+        unsigned octave);
+
+private:
+    unsigned m_octave;
 };
 
 }

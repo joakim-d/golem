@@ -34,8 +34,16 @@ private:
         int height;
     };
 
+    void lookForEntitiesPressed(
+        std::vector<ecs::Entity>& entities_pressed,
+        const std::vector<Entity>& entities,
+        EntityMemoryPool& pool);
+
     WindowSize m_window_size;
     Mouse m_mouse;
+    std::vector<ecs::Entity> m_entities_left_pressed;
+    ecs::Entity m_entity_middle_pressed;
+    ecs::Entity m_entity_right_pressed;
 };
 
 }

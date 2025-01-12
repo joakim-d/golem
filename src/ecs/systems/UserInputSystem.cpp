@@ -22,25 +22,7 @@ void UserInputSystem::update(
     EntityMemoryPool& pool,
     const std::vector<Entity>& entities)
 {
-    treatEvents();
-    auto& window_entity_size = pool.getComponent<Size>(0);
-    window_entity_size.w = m_window_size.width;
-    window_entity_size.h = m_window_size.height;
-    /*
-        for (auto entity : entities) {
-            auto& rectangle = pool.getComponent<Rectangle>(entity);
-            if (containsPoint(rectangle.rectangle, m_mouse.x, m_mouse.y)) {
-                rectangle.rectangle.x = m_mouse.x - rectangle.rectangle.w / 2;
-                rectangle.rectangle.y = m_mouse.y - rectangle.rectangle.h / 2;
-                if (m_mouse.button_states & Mouse::LeftPressed) {
-                    pool.getComponent<MouseArea>(entity).onPressed();
-                }
-            }
-        }*/
-}
 
-void UserInputSystem::treatEvents()
-{
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -54,12 +36,24 @@ void UserInputSystem::treatEvents()
         case SDL_MOUSEMOTION:
             m_mouse.x = event.motion.x;
             m_mouse.y = event.motion.y;
+            for (auto entity : m_entities_left_pressed) {
+                if (pool.hasComponent<onPositionChangedComponent>(entity)) {
+                    pool.getComponent<onPositionChanged>(entity)
+                        .on_position_changed(m_mouse.x, m_mouse.y);
+                }
+            }
             break;
 
         case SDL_MOUSEBUTTONDOWN:
             switch (event.button.button) {
             case SDL_BUTTON_LEFT:
-                m_mouse.button_states |= Mouse::ButtonStates::LeftPressed;
+                lookForEntitiesPressed(m_entities_left_pressed, entities, pool);
+                for (auto entity : m_entities_left_pressed) {
+                    if (pool.hasComponent<OnPressedComponent>(entity)) {
+                        pool.getComponent<OnPressed>(entity)
+                            .on_pressed(Button::Left);
+                    }
+                }
                 break;
             case SDL_BUTTON_RIGHT:
                 m_mouse.button_states |= Mouse::ButtonStates::RightPressed;
@@ -73,6 +67,13 @@ void UserInputSystem::treatEvents()
         case SDL_MOUSEBUTTONUP:
             switch (event.button.button) {
             case SDL_BUTTON_LEFT:
+                for (auto entity : m_entities_left_pressed) {
+                    if (pool.hasComponent<OnReleasedComponent>(entity)) {
+                        pool.getComponent<OnReleased>(entity)
+                            .on_released(Button::Left);
+                    }
+                }
+                m_entities_left_pressed.clear();
                 m_mouse.button_states &= ~(Mouse::ButtonStates::LeftPressed);
                 break;
             case SDL_BUTTON_RIGHT:
@@ -88,5 +89,28 @@ void UserInputSystem::treatEvents()
             break;
         }
     }
+
+    auto& window_entity_size = pool.getComponent<Size>(0);
+    window_entity_size.w = m_window_size.width;
+    window_entity_size.h = m_window_size.height;
 }
+
+void UserInputSystem::lookForEntitiesPressed(
+    std::vector<ecs::Entity>& entities_pressed,
+    const std::vector<Entity>& entities,
+    EntityMemoryPool& pool)
+{
+    ecs::Entity entity_pressed = 0;
+    int previous_z = -10000;
+    for (auto entity : entities) {
+        const auto& position = pool.getComponent<Position>(entity);
+        const auto& size = pool.getComponent<Size>(entity);
+        SDL_Rect rectangle { position.x, position.y, size.w, size.h };
+        if (!containsPoint(rectangle, m_mouse.x, m_mouse.y)) {
+            continue;
+        }
+        entities_pressed.push_back(entity);
+    }
+}
+
 }

@@ -14,7 +14,7 @@ class Renderer {
 public:
     Renderer(
         SDL_Renderer* m_renderer,
-        graphics::TextureManager& font_manager);
+        const graphics::TextureManager& font_manager);
 
     ~Renderer();
 
@@ -24,7 +24,7 @@ public:
 
 private:
     SDL_Renderer* m_renderer;
-    graphics::TextureManager& m_texture_manager;
+    const graphics::TextureManager& m_texture_manager;
 };
 
 }

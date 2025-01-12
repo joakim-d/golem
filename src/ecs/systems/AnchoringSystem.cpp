@@ -40,27 +40,37 @@ void AnchoringSystem::update(
         auto& position = pool.getComponent<Position>(entity);
         auto& size = pool.getComponent<Size>(entity);
 
-        if (pool.hasComponent<AnchorTopComponent>(entity)) {
-            const auto& anchor = pool.getComponent<AnchorTop>(entity);
+        bool hasTop = pool.hasComponent<AnchorTopComponent>(entity);
+        bool hasBottom = pool.hasComponent<AnchorBottomComponent>(entity);
+        bool hasLeft = pool.hasComponent<AnchorLeftComponent>(entity);
+        bool hasRight = pool.hasComponent<AnchorRightComponent>(entity);
 
-            position.y = getYPosition(pool, anchor.entity, anchor.anchorTo) + anchor.margin;
+        // If both anchors it should be stretched
+        if (hasTop && hasBottom) {
+            const auto& anchorTop = pool.getComponent<AnchorTop>(entity);
+            const auto& anchorBottom = pool.getComponent<AnchorBottom>(entity);
+            position.y = getYPosition(pool, anchorTop.entity, anchorTop.anchorTo) + anchorTop.margin;
+            size.h = getYPosition(pool, anchorBottom.entity, anchorBottom.anchorTo) - position.y - anchorBottom.margin;
+        } else if (hasTop) {
+            const auto& anchorTop = pool.getComponent<AnchorTop>(entity);
+            position.y = getYPosition(pool, anchorTop.entity, anchorTop.anchorTo) + anchorTop.margin;
+        } else if (hasBottom) {
+            const auto& anchorBottom = pool.getComponent<AnchorBottom>(entity);
+            position.y = getYPosition(pool, anchorBottom.entity, anchorBottom.anchorTo) - anchorBottom.margin - size.h;
         }
 
-        if (pool.hasComponent<AnchorBottomComponent>(entity)) {
-            const auto& anchor = pool.getComponent<AnchorBottom>(entity);
-            size.h = getYPosition(pool, anchor.entity, anchor.anchorTo) - position.y - anchor.margin;
-        }
-
-        if (pool.hasComponent<AnchorLeftComponent>(entity)) {
-            const auto& anchor = pool.getComponent<AnchorLeft>(entity);
-
-            position.x = getXPosition(pool, anchor.entity, anchor.anchorTo) + anchor.margin;
-        }
-
-        if (pool.hasComponent<AnchorRightComponent>(entity)) {
-            const auto& anchor = pool.getComponent<AnchorRight>(entity);
-
-            size.w = getXPosition(pool, anchor.entity, anchor.anchorTo) - position.x - anchor.margin;
+        // If both anchors it should be stretched
+        if (hasLeft && hasRight) {
+            const auto& anchorLeft = pool.getComponent<AnchorLeft>(entity);
+            const auto& anchorRight = pool.getComponent<AnchorRight>(entity);
+            position.x = getXPosition(pool, anchorLeft.entity, anchorLeft.anchorTo) + anchorLeft.margin;
+            size.w = getXPosition(pool, anchorRight.entity, anchorRight.anchorTo) - position.x - anchorRight.margin;
+        } else if (hasLeft) {
+            const auto& anchorLeft = pool.getComponent<AnchorLeft>(entity);
+            position.x = getXPosition(pool, anchorLeft.entity, anchorLeft.anchorTo) + anchorLeft.margin;
+        } else if (hasRight) {
+            const auto& anchorRight = pool.getComponent<AnchorRight>(entity);
+            position.x = getXPosition(pool, anchorRight.entity, anchorRight.anchorTo) - anchorRight.margin - size.h;
         }
     }
 }

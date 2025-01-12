@@ -6,12 +6,34 @@
 
 namespace ecs {
 
-struct MouseArea {
-    std::function<void()> onClicked;
-    std::function<void()> onPressed;
-    std::function<void()> onReleased;
+enum class Button {
+    Left,
+    Middle,
+    Right
 };
 
-using MouseAreaComponent = Component<MouseArea>;
+struct OnPressed {
+    Button accepted_buttons;
+    std::function<void(Button button)> on_pressed;
+};
+
+struct OnReleased {
+    Button accepted_buttons;
+    std::function<void(Button button)> on_released;
+};
+
+struct OnClicked {
+    Button accepted_buttons;
+    std::function<void(Button button)> on_clicked;
+};
+
+struct onPositionChanged {
+    std::function<void(int x, int y)> on_position_changed;
+};
+
+using OnPressedComponent = Component<OnPressed>;
+using OnReleasedComponent = Component<OnReleased>;
+using OnClickedComponent = Component<OnClicked>;
+using onPositionChangedComponent = Component<onPositionChanged>;
 
 }

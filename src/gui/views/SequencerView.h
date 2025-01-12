@@ -1,18 +1,17 @@
 #pragma once
 
-#include <ecs/Entity.h>
-
 namespace graphics {
 class GraphicsFactory;
+class Widget;
 }
 
 namespace gui::views {
 
-class SongView {
+class SequencerView {
 public:
-    SongView(
+    SequencerView(
         graphics::GraphicsFactory& graphics_factory,
-        ecs::Entity song_view_entity);
+        graphics::Widget& sequencer_view_widget);
 };
 
 }
