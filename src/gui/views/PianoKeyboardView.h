@@ -1,7 +1,5 @@
 #pragma once
 
-#include <ecs/Entity.h>
-
 namespace graphics {
 class GraphicsFactory;
 class Widget;

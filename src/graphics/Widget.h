@@ -2,6 +2,7 @@
 
 #include <SDL2/SDL.h>
 
+#include <graphics/Painter.h>
 #include <graphics/TextureManager.h>
 #include <graphics/core/Color.h>
 
@@ -29,21 +30,22 @@ public:
     Widget& addSize(int width, int height);
     Widget& addZPosition(int z);
     Widget& addTexture(graphics::Texture id);
+    Widget& addUpdateCallback(std::function<void()> callback);
 
     Widget& onPressed(
         ecs::Button accepted_buttons,
-        std::function<void(ecs::Button)> callback);
+        std::function<void(ecs::Button, int x, int y)> callback);
 
     Widget& onReleased(
         ecs::Button accepted_buttons,
-        std::function<void(ecs::Button)> callback);
+        std::function<void(ecs::Button, int x, int y)> callback);
 
     Widget& onClicked(
         ecs::Button accepted_buttons,
-        std::function<void(ecs::Button)> callback);
+        std::function<void(ecs::Button, int x, int y)> callback);
 
     Widget& onPositionChanged(
-        std::function<void(int x, int y)> callback);
+        std::function<void(ecs::Button, int x, int y)> callback);
 
     Widget& anchorTop(
         ecs::Entity entity,
@@ -64,6 +66,9 @@ public:
         ecs::Entity entity,
         ecs::VerticalPosition positionToAnchor,
         int margin = 0);
+
+    Widget& onDraw(
+        std::function<void(graphics::Painter& painter)> draw_callback);
 
     int width() const;
     int height() const;

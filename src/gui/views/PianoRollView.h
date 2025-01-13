@@ -1,7 +1,5 @@
 #pragma once
 
-#include <ecs/Entity.h>
-
 namespace graphics {
 class GraphicsFactory;
 class Widget;
@@ -9,11 +7,10 @@ class Widget;
 
 namespace gui::views {
 
-class PatternView {
+class PianoRollView {
 public:
-    PatternView(
+    PianoRollView(
         graphics::GraphicsFactory& graphics_factory,
-        graphics::Widget& view_widget);
+        const graphics::Widget& view_widget);
 };
-
 }

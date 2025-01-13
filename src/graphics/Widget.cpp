@@ -74,7 +74,7 @@ Widget& Widget::addZPosition(int z)
 
 Widget& Widget::onPressed(
     ecs::Button accepted_buttons,
-    std::function<void(ecs::Button)> callback)
+    std::function<void(ecs::Button, int x, int y)> callback)
 {
     m_manager.addComponent<ecs::OnPressed>(
         entity,
@@ -85,7 +85,7 @@ Widget& Widget::onPressed(
 
 Widget& Widget::onReleased(
     ecs::Button accepted_buttons,
-    std::function<void(ecs::Button)> callback)
+    std::function<void(ecs::Button, int x, int y)> callback)
 {
     m_manager.addComponent<ecs::OnReleased>(
         entity,
@@ -96,7 +96,7 @@ Widget& Widget::onReleased(
 
 Widget& Widget::onClicked(
     ecs::Button accepted_buttons,
-    std::function<void(ecs::Button)> callback)
+    std::function<void(ecs::Button, int x, int y)> callback)
 {
     m_manager.addComponent<ecs::OnClicked>(
         entity,
@@ -106,7 +106,7 @@ Widget& Widget::onClicked(
 }
 
 Widget& Widget::onPositionChanged(
-    std::function<void(int x, int y)> callback)
+    std::function<void(ecs::Button, int x, int y)> callback)
 {
     m_manager.addComponent<ecs::onPositionChanged>(
         entity,
@@ -168,6 +168,24 @@ Widget& Widget::addTexture(graphics::Texture texture)
     m_manager.addComponent<ecs::Texture>(
         entity,
         ecs::Texture { texture });
+
+    return *this;
+}
+
+Widget& Widget::addUpdateCallback(std::function<void()> callback)
+{
+    m_manager.addComponent<ecs::Update>(
+        entity,
+        ecs::Update { std::move(callback) });
+
+    return *this;
+}
+
+Widget& Widget::onDraw(std::function<void(graphics::Painter& painter)> draw_callback)
+{
+    m_manager.addComponent<ecs::Draw>(
+        entity,
+        ecs::Draw { std::move(draw_callback) });
 
     return *this;
 }

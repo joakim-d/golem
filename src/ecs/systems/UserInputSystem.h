@@ -42,8 +42,8 @@ private:
     WindowSize m_window_size;
     Mouse m_mouse;
     std::vector<ecs::Entity> m_entities_left_pressed;
-    ecs::Entity m_entity_middle_pressed;
-    ecs::Entity m_entity_right_pressed;
+    std::vector<ecs::Entity> m_entities_middle_pressed;
+    std::vector<ecs::Entity> m_entities_right_pressed;
 };
 
 }
