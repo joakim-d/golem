@@ -2,6 +2,7 @@
 
 #include <ecs/EntityMemoryPool.h>
 
+#include <ecs/components/DrawComponent.h>
 #include <ecs/components/PositionComponent.h>
 #include <ecs/components/SizeComponent.h>
 #include <ecs/components/TextureComponent.h>
@@ -124,6 +125,15 @@ void Renderer::update(
             const auto& texture_component = pool.getComponent<Texture>(entity);
             auto texture = m_texture_manager.getTexture(texture_component.id);
             renderTexture(texture, m_renderer, position.x, position.y, size.w, size.h);
+        }
+
+        if (pool.hasComponent<DrawComponent>(entity)) {
+            const auto& drawComponent = pool.getComponent<Draw>(entity);
+            SDL_Rect entity_viewport { position.x, position.y, size.w, size.h };
+            SDL_RenderSetViewport(m_renderer, &entity_viewport);
+            graphics::Painter painter { m_renderer, position.x, position.y };
+            drawComponent.draw_callback(painter);
+            SDL_RenderSetViewport(m_renderer, nullptr);
         }
     }
 

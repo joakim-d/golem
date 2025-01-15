@@ -14,26 +14,26 @@ enum class Button {
 
 struct OnPressed {
     Button accepted_buttons;
-    std::function<void(Button button)> on_pressed;
+    std::function<void(Button button, int x, int y)> on_pressed;
 };
 
 struct OnReleased {
     Button accepted_buttons;
-    std::function<void(Button button)> on_released;
+    std::function<void(Button button, int x, int y)> on_released;
 };
 
 struct OnClicked {
     Button accepted_buttons;
-    std::function<void(Button button)> on_clicked;
+    std::function<void(Button button, int x, int y)> on_clicked;
 };
 
 struct onPositionChanged {
-    std::function<void(int x, int y)> on_position_changed;
+    std::function<void(Button button, int x, int y)> on_position_changed;
 };
 
 using OnPressedComponent = Component<OnPressed>;
 using OnReleasedComponent = Component<OnReleased>;
 using OnClickedComponent = Component<OnClicked>;
-using onPositionChangedComponent = Component<onPositionChanged>;
+using OnPositionChangedComponent = Component<onPositionChanged>;
 
 }

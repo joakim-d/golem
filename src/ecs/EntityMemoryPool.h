@@ -4,11 +4,13 @@
 
 #include <ecs/components/AnchorComponent.h>
 #include <ecs/components/BorderComponent.h>
+#include <ecs/components/DrawComponent.h>
 #include <ecs/components/FillComponent.h>
 #include <ecs/components/MouseAreaComponent.h>
 #include <ecs/components/PositionComponent.h>
 #include <ecs/components/SizeComponent.h>
 #include <ecs/components/TextureComponent.h>
+#include <ecs/components/UpdateComponent.h>
 
 #include <ecs/components/MouseAreaComponent.h>
 
@@ -25,12 +27,14 @@ using ComponentVectorTuple = std::tuple<
     std::vector<AnchorLeftComponent>,
     std::vector<AnchorBottomComponent>,
     std::vector<BorderComponent>,
+    std::vector<DrawComponent>,
     std::vector<FillComponent>,
     std::vector<OnClickedComponent>,
-    std::vector<onPositionChangedComponent>,
+    std::vector<OnPositionChangedComponent>,
     std::vector<OnPressedComponent>,
     std::vector<OnReleasedComponent>,
     std::vector<TextureComponent>,
+    std::vector<UpdateComponent>,
     std::vector<PositionComponent>,
     std::vector<SizeComponent>,
     std::vector<ZPositionComponent>>;

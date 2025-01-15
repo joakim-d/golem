@@ -4,6 +4,7 @@
 
 namespace graphics {
 class GraphicsFactory;
+class Widget;
 }
 
 namespace gui::views {
@@ -12,7 +13,7 @@ class SongView {
 public:
     SongView(
         graphics::GraphicsFactory& graphics_factory,
-        ecs::Entity song_view_entity);
+        graphics::Widget& song_view_widget);
 };
 
 }

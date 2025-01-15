@@ -2,7 +2,7 @@
 
 #include <gui/MenuBar.h>
 #include <gui/style/Style.h>
-#include <gui/views/SequencerView.h>
+#include <gui/views/MainView.h>
 #include <gui/views/SongView.h>
 
 #include <graphics/FontManager.h>
@@ -92,20 +92,16 @@ int MainWindow::execute()
               .anchorRight(window_entity, ecs::Right)
               .anchorTop(menu_bar_widget.entity, ecs::Bottom);
 
-    gui::views::SongView { graphics_factory, song_view_widget.entity };
+    gui::views::SongView { graphics_factory, song_view_widget };
 
-    auto sequencer_widget
-        = graphics_factory.createWidget("sequencer_view")
-              .addSize(window_widget.width(), 0)
-              .anchorTop(song_view_widget.entity, ecs::Bottom)
-              //.anchorLeft(window_entity, ecs::Left)
-              //.anchorRight(window_entity, ecs::Right)
+    auto main_widget
+        = graphics_factory.createWidget("main_widget")
+              .anchorTop(song_view_widget.entity, ecs::Bottom, 1)
+              .anchorLeft(window_entity, ecs::Left)
+              .anchorRight(window_entity, ecs::Right)
               .anchorBottom(window_entity, ecs::Bottom);
 
-    gui::views::SequencerView sequencer_view {
-        graphics_factory,
-        sequencer_widget
-    };
+    gui::views::MainView { graphics_factory, main_widget };
 
     ecs::SystemFactory factory { pool, manager };
 
@@ -130,8 +126,8 @@ int MainWindow::execute()
         user_input_system.update();
         updater_system.update();
         anchoring_system.update();
-        renderer_system.update();
 
+        renderer_system.update();
         SDL_Delay(1000 / 60);
     }
 

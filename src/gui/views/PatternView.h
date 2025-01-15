@@ -2,16 +2,18 @@
 
 #include <ecs/Entity.h>
 
-namespace ecs {
-class EntityManager;
+namespace graphics {
+class GraphicsFactory;
+class Widget;
 }
 
 namespace gui::views {
 
 class PatternView {
+public:
     PatternView(
-        ecs::EntityManager& entity_manager,
-        ecs::Entity entity);
+        graphics::GraphicsFactory& graphics_factory,
+        graphics::Widget& view_widget);
 };
 
 }
