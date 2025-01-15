@@ -1,7 +1,6 @@
 #include <gui/views/SequencerView.h>
 
 #include <gui/views/PhraseView.h>
-#include <gui/views/PianoKeyboardView.h>
 
 #include <graphics/GraphicsFactory.h>
 

@@ -1,7 +1,4 @@
-#include <gui/views/PianoKeyboardView.h>
 #include <gui/views/PianoRollView.h>
-
-#include <gui/views/PianoKeyboardView.h>
 
 #include <graphics/GraphicsFactory.h>
 
