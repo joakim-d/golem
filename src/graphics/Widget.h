@@ -67,6 +67,10 @@ public:
         ecs::VerticalPosition positionToAnchor,
         int margin = 0);
 
+    Widget& fill(
+        ecs::Entity entity,
+        int margin = 0);
+
     Widget& onDraw(
         std::function<void(graphics::Painter& painter)> draw_callback);
 

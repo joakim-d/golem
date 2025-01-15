@@ -57,8 +57,8 @@ void UserInputSystem::update(
                 for (auto entity : m_entities_left_pressed) {
                     if (pool.hasComponent<OnPressedComponent>(entity)) {
                         auto& on_pressed = pool.getComponent<OnPressed>(entity);
-                        if (on_pressed.accepted_buttons & (int)Button::Left)
-                            .on_pressed(Button::Left, m_mouse.x, m_mouse.y);
+                        if ((int)on_pressed.accepted_buttons & (int)Button::Left)
+                            on_pressed.on_pressed(Button::Left, m_mouse.x, m_mouse.y);
                     }
                 }
                 break;
