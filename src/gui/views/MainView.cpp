@@ -4,23 +4,36 @@
 
 namespace gui::views {
 
+constexpr int SEQUENCER_HEADER_HEIGHT { 16 };
+
 MainView::MainView(
     graphics::GraphicsFactory& graphics_factory,
-    graphics::Widget& view_widget)
+    graphics::Widget& view_widget,
+    std::shared_ptr<model::Song> song_model,
+    std::shared_ptr<core::NotePlayer>
+        note_player)
     : m_piano_roll_view(
         graphics_factory,
         graphics_factory.createWidget("piano_roll")
             .addSize(64, 0)
             .anchorLeft(view_widget.entity, ecs::Left)
-            .anchorTop(view_widget.entity, ecs::Top)
-            .anchorBottom(view_widget.entity, ecs::Bottom))
+            .anchorTop(view_widget.entity, ecs::Top, 17)
+            .anchorBottom(view_widget.entity, ecs::Bottom),
+        note_player)
+    , m_sequencer_header_view(
+          graphics_factory,
+          graphics_factory.createWidget("sequencer_header")
+              .anchorTop(view_widget.entity, ecs::Top)
+              .anchorLeft(view_widget.entity, ecs::Left, 65)
+              .addSize(0, SEQUENCER_HEADER_HEIGHT))
     , m_sequencer_view(
           graphics_factory,
           graphics_factory.createWidget("sequencer")
-              .anchorTop(view_widget.entity, ecs::Top)
-              .anchorLeft(m_piano_roll_view.getWidget().entity, ecs::Right)
+              .anchorTop(view_widget.entity, ecs::Top, 17)
+              .anchorLeft(m_piano_roll_view.getWidget().entity, ecs::Right, 1)
               .anchorRight(view_widget.entity, ecs::Right)
-              .anchorBottom(view_widget.entity, ecs::Bottom))
+              .anchorBottom(view_widget.entity, ecs::Bottom),
+          song_model)
     , m_x_offset(0)
     , m_y_offset(0)
 {
@@ -49,7 +62,7 @@ MainView::MainView(
             m_y_offset += press_tracking->previous_y - y;
 
             const int max_y_offset
-                = m_piano_roll_view.viewHeight() - view_widget.height();
+                = m_piano_roll_view.viewHeight() - view_widget.height() + SEQUENCER_HEADER_HEIGHT;
 
             const int max_x_offset
                 = m_sequencer_view.viewWidth() - view_widget.width();
@@ -73,6 +86,7 @@ MainView::MainView(
             press_tracking->previous_y = y;
 
             m_sequencer_view.setOffsets(m_x_offset, m_y_offset);
+            m_sequencer_header_view.setXOffset(m_x_offset);
             m_piano_roll_view.setYOffset(m_y_offset);
         });
 
@@ -81,6 +95,11 @@ MainView::MainView(
         [press_tracking](ecs::Button, int x, int y) {
             press_tracking->pressed = false;
         });
+}
+
+void MainView::setCurrentTrackIndex(size_t track_index)
+{
+    m_sequencer_view.setCurrentTrackIndex(track_index);
 }
 
 }

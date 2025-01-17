@@ -2,6 +2,8 @@
 
 #include <graphics/GraphicsFactory.h>
 
+#include <core/NotePlayer.h>
+
 #include <ecs/Entity.h>
 
 namespace gui::views {
@@ -31,8 +33,10 @@ namespace {
 
 PianoRollView::PianoRollView(
     graphics::GraphicsFactory& graphics_factory,
-    graphics::Widget& view_widget)
+    graphics::Widget& view_widget,
+    std::shared_ptr<core::NotePlayer> note_player)
     : m_view_widget(view_widget)
+    , m_note_player(std::move(note_player))
     , m_y_offset(0)
 {
     const int spacing = 1;
@@ -97,6 +101,11 @@ PianoRollView::PianoRollView(
             current_key.w = keys_rectangles[i].w;
             painter.fillRectangle(current_key, black_color);
         }
+    });
+
+    view_widget.onPressed(ecs::Button::Left, [this](ecs::Button, int x, int y) {
+        size_t note = ((viewHeight() - y - m_y_offset) / BLACK_KEY_HEIGHT);
+        m_note_player->play(Channel::Channel1, 0, model::Note(note));
     });
 }
 

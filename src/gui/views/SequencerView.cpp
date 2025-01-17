@@ -4,7 +4,7 @@
 
 #include <graphics/GraphicsFactory.h>
 
-#include <iostream>
+#include <model/Song.h>
 
 namespace {
 
@@ -23,8 +23,9 @@ static graphics::core::Color COLORS[12] {
     graphics::core::Color::fromHexa("#222222"),
 };
 
-constexpr int CELL_WIDTH = 16;
-constexpr int SPACING = 1;
+constexpr int CELL_WIDTH = 15;
+constexpr int CELL_HEIGHT = 13;
+constexpr int CELL_SPACING = 1;
 constexpr int NOTES_BY_PHRASE = 16;
 constexpr int PHRASE_COUNT = 16;
 
@@ -34,19 +35,19 @@ namespace gui::views {
 
 SequencerView::SequencerView(
     graphics::GraphicsFactory& graphics_factory,
-    graphics::Widget& sequencer_view_widget)
+    graphics::Widget& sequencer_view_widget,
+    std::shared_ptr<model::Song> song_model)
     : m_x_offset(0)
     , m_y_offset(0)
+    , m_current_track_index(0)
 {
     sequencer_view_widget.onDraw(
-        [sequencer_view_widget, this](graphics::Painter& painter) {
-            const int cell_width = 16;
-            const int cell_height = 13;
-            const int cell_spacing = 1;
-            const int cell_by_row = (sequencer_view_widget.width() / (cell_width + cell_spacing)) + 1;
-            const int cell_by_column = (sequencer_view_widget.height() / (cell_height + cell_spacing)) + 1;
-            const int start_j = m_y_offset / (cell_height + cell_spacing);
-            const int start_i = m_x_offset / (cell_width + cell_spacing);
+        [sequencer_view_widget, this, song_model](
+            graphics::Painter& painter) {
+            const int cell_by_row = (sequencer_view_widget.width() / (CELL_WIDTH + CELL_SPACING)) + 1;
+            const int cell_by_column = (sequencer_view_widget.height() / (CELL_HEIGHT + CELL_SPACING)) + 1;
+            const int start_j = m_y_offset / (CELL_HEIGHT + CELL_SPACING);
+            const int start_i = m_x_offset / (CELL_WIDTH + CELL_SPACING);
 
             const int draw_cells_on_row
                 = start_i + cell_by_row > NOTES_BY_PHRASE * PHRASE_COUNT
@@ -58,22 +59,43 @@ SequencerView::SequencerView(
                 ? (12 * 6) - start_j
                 : cell_by_column;
 
-            const int start_x_offset = (m_x_offset % (cell_width + 1));
-            const int start_y_offset = (m_y_offset % (cell_height + 1));
+            const int start_x_offset = (m_x_offset % (CELL_WIDTH + 1));
+            const int start_y_offset = (m_y_offset % (CELL_HEIGHT + 1));
 
+            // Draw note grid
             SDL_Rect rects[cell_by_row * cell_by_column];
             int rect_index = 0;
             for (int j = 0; j < draw_cells_on_column; j++) {
                 for (int i = 0; i < draw_cells_on_row; i++) {
-                    rects[rect_index].w = cell_width;
-                    rects[rect_index].h = cell_height;
-                    rects[rect_index].x = i * (cell_width + cell_spacing) - start_x_offset;
-                    rects[rect_index++].y = j * (cell_height + cell_spacing) - start_y_offset;
+                    rects[rect_index].w = CELL_WIDTH;
+                    rects[rect_index].h = CELL_HEIGHT;
+                    rects[rect_index].x = i * (CELL_WIDTH + CELL_SPACING) - start_x_offset;
+                    rects[rect_index++].y = j * (CELL_HEIGHT + CELL_SPACING) - start_y_offset;
                 }
                 painter.fillRectangles(
                     rects + j * draw_cells_on_row,
                     draw_cells_on_row,
                     COLORS[(j + start_j) % 12]);
+            }
+
+            // Draw notes
+            SDL_Rect rect;
+            rect.w = CELL_WIDTH;
+            rect.h = CELL_HEIGHT;
+            for (int i = 0; i < draw_cells_on_row; i++) {
+                const int current_phrase = (i + start_i) / NOTES_BY_PHRASE;
+                const int current_note_index = (i + start_i) % NOTES_BY_PHRASE;
+
+                auto phrase_index = song_model->getTrack(m_current_track_index).phraseIndex(current_phrase);
+                if (!phrase_index.has_value())
+                    continue;
+
+                const auto note = song_model->getPhrase(*phrase_index).note(current_note_index);
+                if (!note.has_value())
+                    continue;
+                rect.x = i * (CELL_WIDTH + CELL_SPACING) - start_x_offset;
+                rect.y = ((6 * 12 - int(*note)) - 1) * (CELL_HEIGHT + CELL_SPACING) - m_y_offset;
+                painter.fillRectangle(rect, graphics::core::Color::fromHexa("#ff0000"));
             }
         });
 }
@@ -86,7 +108,12 @@ void SequencerView::setOffsets(int x_offset, int y_offset)
 
 int SequencerView::viewWidth() const
 {
-    return (CELL_WIDTH + SPACING) * NOTES_BY_PHRASE * PHRASE_COUNT;
+    return (CELL_WIDTH + CELL_SPACING) * NOTES_BY_PHRASE * PHRASE_COUNT;
+}
+
+void SequencerView::setCurrentTrackIndex(size_t track_index)
+{
+    m_current_track_index = track_index;
 }
 
 }

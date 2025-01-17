@@ -22,14 +22,24 @@ void UserInputSystem::update(
     EntityMemoryPool& pool,
     const std::vector<Entity>& entities)
 {
-
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_WINDOWEVENT:
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED) {
+            if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
                 m_window_size.width = event.window.data1;
                 m_window_size.height = event.window.data2;
+            }
+            break;
+
+        case SDL_KEYDOWN:
+            for (auto entity : m_last_entities_left_pressed) {
+                if (pool.hasComponent<OnKeyPressedComponent>(entity)) {
+                    ecs::KeyBoardContext context;
+                    context.key_pressed = event.key.keysym.sym;
+                    pool.getComponent<OnKeyPressed>(entity)
+                        .on_pressed(context);
+                }
             }
             break;
 
@@ -38,14 +48,22 @@ void UserInputSystem::update(
             m_mouse.y = event.motion.y;
             for (auto entity : m_entities_left_pressed) {
                 if (pool.hasComponent<OnPositionChangedComponent>(entity)) {
-                    pool.getComponent<onPositionChanged>(entity)
-                        .on_position_changed(Button::Left, m_mouse.x, m_mouse.y);
+                    const auto& position = pool.getComponent<Position>(entity);
+                    pool.getComponent<OnPositionChanged>(entity)
+                        .on_position_changed(
+                            Button::Left,
+                            m_mouse.x - position.x,
+                            m_mouse.y - position.y);
                 }
             }
             for (auto entity : m_entities_middle_pressed) {
                 if (pool.hasComponent<OnPositionChangedComponent>(entity)) {
-                    pool.getComponent<onPositionChanged>(entity)
-                        .on_position_changed(Button::Middle, m_mouse.x, m_mouse.y);
+                    const auto& position = pool.getComponent<Position>(entity);
+                    pool.getComponent<OnPositionChanged>(entity)
+                        .on_position_changed(
+                            Button::Middle,
+                            m_mouse.x - position.x,
+                            m_mouse.y - position.y);
                 }
             }
             break;
@@ -57,10 +75,16 @@ void UserInputSystem::update(
                 for (auto entity : m_entities_left_pressed) {
                     if (pool.hasComponent<OnPressedComponent>(entity)) {
                         auto& on_pressed = pool.getComponent<OnPressed>(entity);
-                        if ((int)on_pressed.accepted_buttons & (int)Button::Left)
-                            on_pressed.on_pressed(Button::Left, m_mouse.x, m_mouse.y);
+                        if ((int)on_pressed.accepted_buttons & (int)Button::Left) {
+                            const auto& position = pool.getComponent<Position>(entity);
+                            on_pressed.on_pressed(
+                                Button::Left,
+                                m_mouse.x - position.x,
+                                m_mouse.y - position.y);
+                        }
                     }
                 }
+                m_last_entities_left_pressed = m_entities_left_pressed;
                 break;
             case SDL_BUTTON_RIGHT:
                 m_mouse.button_states |= Mouse::ButtonStates::RightPressed;
@@ -68,9 +92,13 @@ void UserInputSystem::update(
             case SDL_BUTTON_MIDDLE:
                 lookForEntitiesPressed(m_entities_middle_pressed, entities, pool);
                 for (auto entity : m_entities_middle_pressed) {
-                    if (pool.hasComponent<OnPressedComponent>(entity)) {
-                        pool.getComponent<OnPressed>(entity)
-                            .on_pressed(Button::Middle, m_mouse.x, m_mouse.y);
+                    auto& on_released = pool.getComponent<OnPressed>(entity);
+                    if ((int)on_released.accepted_buttons & (int)Button::Middle) {
+                        const auto& position = pool.getComponent<Position>(entity);
+                        on_released.on_pressed(
+                            Button::Middle,
+                            m_mouse.x - position.x,
+                            m_mouse.y - position.y);
                     }
                 }
                 break;
@@ -81,9 +109,13 @@ void UserInputSystem::update(
             switch (event.button.button) {
             case SDL_BUTTON_LEFT:
                 for (auto entity : m_entities_left_pressed) {
-                    if (pool.hasComponent<OnReleasedComponent>(entity)) {
-                        pool.getComponent<OnReleased>(entity)
-                            .on_released(Button::Left, m_mouse.x, m_mouse.y);
+                    auto& on_released = pool.getComponent<OnReleased>(entity);
+                    if ((int)on_released.accepted_buttons & (int)Button::Left) {
+                        const auto& position = pool.getComponent<Position>(entity);
+                        on_released.on_released(
+                            Button::Left,
+                            m_mouse.x - position.x,
+                            m_mouse.y - position.y);
                     }
                 }
                 m_entities_left_pressed.clear();
@@ -94,9 +126,13 @@ void UserInputSystem::update(
                 break;
             case SDL_BUTTON_MIDDLE:
                 for (auto entity : m_entities_middle_pressed) {
-                    if (pool.hasComponent<OnReleasedComponent>(entity)) {
-                        pool.getComponent<OnReleased>(entity)
-                            .on_released(Button::Middle, m_mouse.x, m_mouse.y);
+                    auto& on_released = pool.getComponent<OnReleased>(entity);
+                    if ((int)on_released.accepted_buttons & (int)Button::Middle) {
+                        const auto& position = pool.getComponent<Position>(entity);
+                        on_released.on_released(
+                            Button::Middle,
+                            m_mouse.x - position.x,
+                            m_mouse.y - position.y);
                     }
                 }
                 m_entities_middle_pressed.clear();
@@ -132,5 +168,4 @@ void UserInputSystem::lookForEntitiesPressed(
         entities_pressed.push_back(entity);
     }
 }
-
 }

@@ -12,6 +12,8 @@ namespace gui::views {
 
 namespace {
     constexpr int Z_POSITION_OFFSET = 10;
+    constexpr int PHRASE_WIDTH = 128;
+    constexpr int NOTE_WIDTH = PHRASE_WIDTH / 16;
 }
 
 struct MouseState {
@@ -22,7 +24,15 @@ struct MouseState {
 
 SongView::SongView(
     graphics::GraphicsFactory& graphics_factory,
-    graphics::Widget& song_view_widget)
+    graphics::Widget& song_view_widget,
+    std::shared_ptr<model::Song> song_model)
+    : m_progression_bar(graphics_factory.createWidget("progression_bar")
+                            .anchorTop(song_view_widget.entity, ecs::Top)
+                            .anchorBottom(song_view_widget.entity, ecs::Bottom)
+                            .addSize(3, 0)
+                            .addFill(graphics::core::Color { 255, 0, 0, 128 })
+                            .addZPosition(1))
+    , m_x_offset(0)
 {
     const auto song_view_entity = song_view_widget.entity;
     const auto firstColor = graphics::core::Color::fromHexa("#111111");
@@ -30,8 +40,6 @@ SongView::SongView(
 
     std::vector<graphics::Widget> widgets_to_move;
     widgets_to_move.reserve(4 * 16);
-
-    auto x_offset = std::make_shared<int>();
 
     // Header row
     auto header_first_cell
@@ -52,10 +60,9 @@ SongView::SongView(
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 16)
             .anchorTop(song_view_entity, ecs::Top)
-            //.addPosition(65 + (128 * i), 0)
-            .addUpdateCallback([current_widget, i, x_offset]() {
+            .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
-                widget.addPosition(65 + (128 * i) + *x_offset, 0);
+                widget.addPosition(65 + (128 * i) - m_x_offset, 0);
             });
 
         previousEntity = current_widget.entity;
@@ -89,17 +96,28 @@ SongView::SongView(
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
-            = graphics_factory.createWidget("song_view_header_cell");
+            = graphics_factory.createWidget("song_view_pulse_1_cell");
 
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
             .anchorTop(previousEntity, ecs::Top)
             .addPosition(65 + (128 * i), 0)
-            .addUpdateCallback([current_widget, i, x_offset]() {
+            .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
-                widget.addPosition(65 + (128 * i) + *x_offset, 0);
+                widget.addPosition(65 + (128 * i) - m_x_offset, 0);
+            })
+            .onPressed(ecs::Button::Left, [this](ecs::Button, int x, int y) {
+                trackClicked(0);
             });
+
+        views::PatternView pattern_view {
+            graphics_factory,
+            current_widget,
+            song_model,
+            0,
+            i
+        };
 
         previousEntity = current_widget.entity;
     }
@@ -123,17 +141,28 @@ SongView::SongView(
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
-            = graphics_factory.createWidget("song_view_header_cell");
+            = graphics_factory.createWidget("song_view_pulse_2_cell");
 
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
             .anchorTop(previousEntity, ecs::Top)
             .addPosition(65 + (128 * i), 0)
-            .addUpdateCallback([current_widget, i, x_offset]() {
+            .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
-                widget.addPosition(65 + (128 * i) + *x_offset, 0);
+                widget.addPosition(65 + (128 * i) - m_x_offset, 0);
+            })
+            .onPressed(ecs::Button::Left, [this](ecs::Button, int x, int y) {
+                trackClicked(1);
             });
+
+        views::PatternView pattern_view {
+            graphics_factory,
+            current_widget,
+            song_model,
+            1,
+            i
+        };
 
         previousEntity = current_widget.entity;
     }
@@ -157,16 +186,27 @@ SongView::SongView(
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
-            = graphics_factory.createWidget("song_view_header_cell");
+            = graphics_factory.createWidget("song_view_wave_first_cell");
 
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
             .anchorTop(previousEntity, ecs::Top)
-            .addUpdateCallback([current_widget, i, x_offset]() {
+            .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
-                widget.addPosition(65 + (128 * i) + *x_offset, 0);
+                widget.addPosition(65 + (128 * i) - m_x_offset, 0);
+            })
+            .onPressed(ecs::Button::Left, [this](ecs::Button, int x, int y) {
+                trackClicked(2);
             });
+
+        views::PatternView pattern_view {
+            graphics_factory,
+            current_widget,
+            song_model,
+            2,
+            i
+        };
 
         previousEntity = current_widget.entity;
     }
@@ -190,19 +230,27 @@ SongView::SongView(
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
-            = graphics_factory.createWidget("song_view_header_cell");
+            = graphics_factory.createWidget("song_view_noise_cell");
 
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
             .anchorTop(previousEntity, ecs::Top)
-            .addUpdateCallback([current_widget, i, x_offset]() {
+            .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
-                widget.addPosition(65 + (128 * i) + *x_offset, 0);
+                widget.addPosition(65 + (128 * i) - m_x_offset, 0);
+            })
+            .onPressed(ecs::Button::Left, [this](ecs::Button, int x, int y) {
+                trackClicked(3);
             });
 
-        views::PatternView pattern_view { graphics_factory, current_widget };
-
+        views::PatternView pattern_view {
+            graphics_factory,
+            current_widget,
+            song_model,
+            3,
+            i
+        };
         previousEntity = current_widget.entity;
     }
 
@@ -222,20 +270,28 @@ SongView::SongView(
         });
 
     song_view_widget.onPositionChanged(
-        [mouse_state, x_offset, song_view_widget](ecs::Button, int x, int y) {
+        [mouse_state, this, song_view_widget](ecs::Button, int x, int y) {
             if (!mouse_state->pressed) {
                 return;
             }
             const int delta_x = x - mouse_state->previous_x;
-            *x_offset += delta_x;
-            const auto max_delta = -128 * 16 + song_view_widget.width() - 64;
-            if (*x_offset > 0) {
-                *x_offset = 0;
-            } else if (*x_offset < max_delta) {
-                *x_offset = max_delta;
+            m_x_offset -= delta_x;
+            const auto max_delta = PHRASE_WIDTH * 16 - song_view_widget.width() + 64;
+
+            if (m_x_offset < 0) {
+                m_x_offset = 0;
+            } else if (m_x_offset > max_delta) {
+                m_x_offset = max_delta;
             }
             mouse_state->previous_x = x;
         });
+}
+
+void SongView::onProgressionChanged(
+    size_t note_index, size_t phrase_index)
+{
+    m_progression_bar
+        .addPosition(65 + (phrase_index * PHRASE_WIDTH) + (NOTE_WIDTH * note_index) - m_x_offset, 0);
 }
 
 }

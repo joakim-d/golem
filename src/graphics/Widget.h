@@ -8,6 +8,7 @@
 
 #include <ecs/Entity.h>
 #include <ecs/components/AnchorComponent.h>
+#include <ecs/components/KeyboardInputComponent.h>
 #include <ecs/components/MouseAreaComponent.h>
 #include <ecs/components/TextureComponent.h>
 
@@ -31,6 +32,9 @@ public:
     Widget& addZPosition(int z);
     Widget& addTexture(graphics::Texture id);
     Widget& addUpdateCallback(std::function<void()> callback);
+
+    Widget& onKeyPressed(
+        std::function<void(ecs::KeyBoardContext)> callback);
 
     Widget& onPressed(
         ecs::Button accepted_buttons,

@@ -6,6 +6,10 @@ extern "C" {
 struct SDL_Window;
 }
 
+namespace model {
+class Song;
+}
+
 namespace gui {
 
 class MainWindow {
