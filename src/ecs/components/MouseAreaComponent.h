@@ -7,9 +7,9 @@
 namespace ecs {
 
 enum class Button {
-    Left,
-    Middle,
-    Right
+    Left = 1,
+    Middle = 2,
+    Right = 4
 };
 
 struct OnPressed {
@@ -27,13 +27,13 @@ struct OnClicked {
     std::function<void(Button button, int x, int y)> on_clicked;
 };
 
-struct onPositionChanged {
+struct OnPositionChanged {
     std::function<void(Button button, int x, int y)> on_position_changed;
 };
 
 using OnPressedComponent = Component<OnPressed>;
 using OnReleasedComponent = Component<OnReleased>;
 using OnClickedComponent = Component<OnClicked>;
-using OnPositionChangedComponent = Component<onPositionChanged>;
+using OnPositionChangedComponent = Component<OnPositionChanged>;
 
 }

@@ -44,6 +44,8 @@ private:
     std::vector<ecs::Entity> m_entities_left_pressed;
     std::vector<ecs::Entity> m_entities_middle_pressed;
     std::vector<ecs::Entity> m_entities_right_pressed;
+
+    std::vector<ecs::Entity> m_last_entities_left_pressed;
 };
 
 }

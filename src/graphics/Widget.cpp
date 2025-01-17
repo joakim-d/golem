@@ -72,6 +72,16 @@ Widget& Widget::addZPosition(int z)
     return *this;
 }
 
+Widget& Widget::onKeyPressed(
+    std::function<void(ecs::KeyBoardContext)> callback)
+{
+    m_manager.addComponent<ecs::OnKeyPressed>(
+        entity,
+        ecs::OnKeyPressed { std::move(callback) });
+
+    return *this;
+}
+
 Widget& Widget::onPressed(
     ecs::Button accepted_buttons,
     std::function<void(ecs::Button, int x, int y)> callback)
@@ -108,9 +118,9 @@ Widget& Widget::onClicked(
 Widget& Widget::onPositionChanged(
     std::function<void(ecs::Button, int x, int y)> callback)
 {
-    m_manager.addComponent<ecs::onPositionChanged>(
+    m_manager.addComponent<ecs::OnPositionChanged>(
         entity,
-        ecs::onPositionChanged { std::move(callback) });
+        ecs::OnPositionChanged { std::move(callback) });
 
     return *this;
 }

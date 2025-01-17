@@ -9,6 +9,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+add_subdirectory(
+    submodules/json
+)
+
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
@@ -37,6 +41,7 @@ target_link_libraries(
     SDL2::Main
     SDL2::Image
     SDL2::TTF
+    nlohmann_json::nlohmann_json
 )
 
 include(GNUInstallDirs)

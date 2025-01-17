@@ -1,0 +1,52 @@
+#pragma once
+
+#include <core/Channel.h>
+#include <model/Note.h>
+#include <model/instruments/WaveInstrument.h>
+
+#include <memory>
+#include <optional>
+
+class IAudioProcessingUnit;
+
+namespace model {
+class Instrument;
+class PulseInstrument;
+class Song;
+class WaveInstrument;
+}
+
+namespace core {
+
+class NotePlayer {
+public:
+    NotePlayer(
+        std::shared_ptr<model::Song> song_model,
+        std::shared_ptr<IAudioProcessingUnit> audio_processing_unit);
+
+    void play(
+        Channel channel,
+        size_t instrument_index,
+        std::optional<model::Note> note);
+
+    void stop(Channel channel);
+
+private:
+    void setChannel1Instrument(
+        const model::PulseInstrument& pulse,
+        std::optional<model::Note> note);
+
+    void setChannel2Instrument(
+        const model::PulseInstrument& pulse,
+        std::optional<model::Note> note);
+
+    void setChannel3Instrument(
+        const model::WaveInstrument& wave,
+        std::optional<model::Note> note);
+
+    std::shared_ptr<model::Song> m_song_model;
+    std::shared_ptr<IAudioProcessingUnit> m_audio_processing_unit;
+    model::WaveInstrument m_wave;
+};
+
+}

@@ -6,6 +6,7 @@
 #include <ecs/components/BorderComponent.h>
 #include <ecs/components/DrawComponent.h>
 #include <ecs/components/FillComponent.h>
+#include <ecs/components/KeyboardInputComponent.h>
 #include <ecs/components/MouseAreaComponent.h>
 #include <ecs/components/PositionComponent.h>
 #include <ecs/components/SizeComponent.h>
@@ -29,6 +30,7 @@ using ComponentVectorTuple = std::tuple<
     std::vector<BorderComponent>,
     std::vector<DrawComponent>,
     std::vector<FillComponent>,
+    std::vector<OnKeyPressedComponent>,
     std::vector<OnClickedComponent>,
     std::vector<OnPositionChangedComponent>,
     std::vector<OnPressedComponent>,

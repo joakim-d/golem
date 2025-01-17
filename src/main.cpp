@@ -4,10 +4,11 @@
 
 int main(int argc, char* argv[])
 {
-    auto window = gui::MainWindow::create(
-        800,
-        600,
-        "[GoleM]");
+    auto window
+        = gui::MainWindow::create(
+            800,
+            600,
+            "[GoleM]");
 
     if (!window.has_value()) {
         std::cerr << "Failed to create MainWindow" << std::endl;
