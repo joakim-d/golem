@@ -4,6 +4,7 @@
 #include <core/IPlayingProgressionTracker.h>
 #include <core/NotePlayer.h>
 
+#include <model/Note.h>
 #include <model/Song.h>
 
 namespace core {
@@ -12,11 +13,11 @@ SongPlayer::SongPlayer(
     std::shared_ptr<model::Song> song,
     std::shared_ptr<IAudioProcessingUnit> audio_processing_unit,
     std::shared_ptr<IPlayingProgressionTracker> progression_tracker,
-    std::shared_ptr<core::NotePlayer> instrument_affector)
+    std::shared_ptr<core::NotePlayer> note_player)
     : m_song(std::move(song))
     , m_audio_processing_unit(std::move(audio_processing_unit))
     , m_playing_progression_tracker(std::move(progression_tracker))
-    , m_note_player(std::move(instrument_affector))
+    , m_note_player(std::move(note_player))
     , m_stop(false)
 {
 }
@@ -24,14 +25,6 @@ SongPlayer::SongPlayer(
 SongPlayer::~SongPlayer()
 {
     stop();
-}
-
-void SongPlayer::playNote(model::Note note, size_t instrument_index)
-{
-    m_note_player->play(
-        Channel::Channel1,
-        instrument_index,
-        note);
 }
 
 void SongPlayer::playSong()
@@ -48,6 +41,7 @@ void SongPlayer::playSong(const model::Song& song)
     struct PlayStatus {
         size_t currentPhrase = 0;
         size_t currentNote = 0;
+        size_t durationLeft = 0;
         bool stopped = false;
     };
 
@@ -71,13 +65,23 @@ void SongPlayer::playSong(const model::Song& song)
 
             const auto& note = phrase.note(status.currentNote);
 
-            const auto instrument_index = phrase.instrumentIndex(status.currentNote);
-            if (instrument_index.has_value()) {
+            if (note.has_value()) {
                 m_note_player->play(
                     static_cast<Channel>(
                         (unsigned)(Channel::Channel1) + track_index),
-                    *instrument_index,
-                    phrase.note(status.currentNote));
+                    note->instrumentIndex(),
+                    note->frequency());
+                status.durationLeft = note->duration();
+            } else {
+                if (status.durationLeft > 0) {
+                    status.durationLeft--;
+                    if (status.durationLeft == 0) {
+                        m_note_player->stop(
+                            static_cast<Channel>(
+                                unsigned(Channel::Channel1)
+                                + track_index));
+                    }
+                }
             }
 
             status.currentNote++;
@@ -115,6 +119,11 @@ void SongPlayer::playSong(const model::Song& song)
             globalStatus.currentNote,
             globalStatus.currentPhrase);
     }
+
+    m_note_player->stop(Channel::Channel1);
+    m_note_player->stop(Channel::Channel2);
+    m_note_player->stop(Channel::Channel3);
+    m_note_player->stop(Channel::Channel4);
 }
 
 void SongPlayer::stop()
