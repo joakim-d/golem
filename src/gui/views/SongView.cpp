@@ -29,7 +29,7 @@ SongView::SongView(
     : m_progression_bar(graphics_factory.createWidget("progression_bar")
                             .anchorTop(song_view_widget.entity, ecs::Top)
                             .anchorBottom(song_view_widget.entity, ecs::Bottom)
-                            .addSize(3, 0)
+                            .addSize(1, 0)
                             .addFill(graphics::core::Color { 255, 0, 0, 128 })
                             .addZPosition(1))
     , m_x_offset(0)
@@ -291,7 +291,10 @@ void SongView::onProgressionChanged(
     size_t note_index, size_t phrase_index)
 {
     m_progression_bar
-        .addPosition(65 + (phrase_index * PHRASE_WIDTH) + (NOTE_WIDTH * note_index) - m_x_offset, 0);
+        .addPosition(65
+                + (phrase_index * PHRASE_WIDTH)
+                + (NOTE_WIDTH * note_index) - m_x_offset,
+            0);
 }
 
 }

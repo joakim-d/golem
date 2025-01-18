@@ -143,7 +143,9 @@ int MainWindow::execute()
             main_view.setCurrentTrackIndex(track);
         });
 
-    auto progression_tracker = std::make_shared<PlayProgressionTracker>(song_view);
+    auto progression_tracker = std::make_shared<PlayProgressionTracker>(
+        song_view,
+        main_view);
 
     core::SongPlayer song_player {
         song_model,
