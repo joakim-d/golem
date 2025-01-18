@@ -33,6 +33,13 @@ MainView::MainView(
               .anchorLeft(m_piano_roll_view.getWidget().entity, ecs::Right, 1)
               .anchorRight(view_widget.entity, ecs::Right)
               .anchorBottom(view_widget.entity, ecs::Bottom),
+          graphics_factory.createWidget("progression_tracking_bar")
+              .anchorTop(view_widget.entity, ecs::Top)
+              .anchorBottom(view_widget.entity, ecs::Bottom)
+              .addSize(1, 0)
+              .addZPosition(1)
+              .addPosition(65, 0)
+              .addFill(graphics::core::Color { 255, 0, 0, 32 }),
           song_model)
     , m_x_offset(0)
     , m_y_offset(0)
@@ -95,6 +102,15 @@ MainView::MainView(
         [press_tracking](ecs::Button, int x, int y) {
             press_tracking->pressed = false;
         });
+}
+
+void MainView::onProgressionChanged(
+    size_t note_index,
+    size_t phrase_index)
+{
+    m_sequencer_view.onProgressionChanged(
+        note_index,
+        phrase_index);
 }
 
 void MainView::setCurrentTrackIndex(size_t track_index)

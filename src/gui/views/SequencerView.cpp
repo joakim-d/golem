@@ -28,6 +28,7 @@ constexpr int CELL_HEIGHT = 13;
 constexpr int CELL_SPACING = 1;
 constexpr int NOTES_BY_PHRASE = 16;
 constexpr int PHRASE_COUNT = 16;
+constexpr int PHRASE_WIDTH = ((CELL_WIDTH + CELL_SPACING) * NOTES_BY_PHRASE);
 
 }
 
@@ -36,8 +37,11 @@ namespace gui::views {
 SequencerView::SequencerView(
     graphics::GraphicsFactory& graphics_factory,
     graphics::Widget& sequencer_view_widget,
+    graphics::Widget& progression_bar_widget,
     std::shared_ptr<model::Song> song_model)
-    : m_x_offset(0)
+    : m_sequencer_widget(sequencer_view_widget)
+    , m_progression_bar_widget(progression_bar_widget)
+    , m_x_offset(0)
     , m_y_offset(0)
     , m_current_track_index(0)
 {
@@ -104,6 +108,7 @@ void SequencerView::setOffsets(int x_offset, int y_offset)
 {
     m_x_offset = x_offset;
     m_y_offset = y_offset;
+    updateProgressionBar();
 }
 
 int SequencerView::viewWidth() const
@@ -114,6 +119,30 @@ int SequencerView::viewWidth() const
 void SequencerView::setCurrentTrackIndex(size_t track_index)
 {
     m_current_track_index = track_index;
+}
+
+void SequencerView::onProgressionChanged(
+    size_t note_index,
+    size_t phrase_index)
+{
+    m_last_note_index = note_index;
+    m_last_phrase_index = phrase_index;
+    updateProgressionBar();
+}
+
+void SequencerView::updateProgressionBar()
+{
+    const int sequencer_widget_x = m_sequencer_widget.x();
+    const int x_position = sequencer_widget_x
+        + m_last_phrase_index * PHRASE_WIDTH
+        + (m_last_note_index * (CELL_WIDTH + CELL_SPACING))
+        - m_x_offset;
+
+    m_progression_bar_widget
+        .addPosition(x_position >= sequencer_widget_x
+                ? x_position
+                : sequencer_widget_x,
+            0);
 }
 
 }
