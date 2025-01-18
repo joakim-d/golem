@@ -192,7 +192,7 @@ int MainWindow::execute()
     SDL_Quit();
 
     core::song_saver::JsonSongSaver saver;
-    // saver.saveSong(*song_model, TEMP_SONG_FILE);
+    saver.saveSong(*song_model, TEMP_SONG_FILE);
 
     return 0;
 }
