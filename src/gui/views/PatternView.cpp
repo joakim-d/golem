@@ -32,10 +32,10 @@ PatternView::PatternView(
                 auto current_note = phrase.note(i);
                 if (!current_note.has_value())
                     continue;
-                if (!lowest_note.has_value() || *current_note < *lowest_note) {
+                if (!lowest_note.has_value() || current_note->frequency() < lowest_note->frequency()) {
                     lowest_note = *current_note;
                 }
-                if (!highest_note.has_value() || *current_note > *highest_note) {
+                if (!highest_note.has_value() || current_note->frequency() > highest_note->frequency()) {
                     highest_note = *current_note;
                 }
             }
@@ -45,10 +45,10 @@ PatternView::PatternView(
             }
             if (!lowest_note.has_value()
                 || !highest_note.has_value()
-                || int(*highest_note) - int(*lowest_note) < 7) {
+                || int(highest_note->frequency()) - int(lowest_note->frequency()) < 7) {
                 scale = 8;
             } else {
-                scale = int(*highest_note) - int(*lowest_note) + 1;
+                scale = int(highest_note->frequency()) - int(lowest_note->frequency()) + 1;
             }
 
             const int note_height = height / scale;
@@ -60,9 +60,11 @@ PatternView::PatternView(
                     continue;
                 }
                 rectangle.x = note_width * i;
-                rectangle.y = height - ((int(*current_note) - int(*lowest_note) + 1) * note_height);
+                rectangle.y
+                    = height
+                    - ((int(current_note->frequency()) - int(lowest_note->frequency()) + 1) * note_height);
                 rectangle.h = note_height;
-                rectangle.w = note_width;
+                rectangle.w = note_width * current_note->duration();
 
                 painter.fillRectangle(
                     rectangle,

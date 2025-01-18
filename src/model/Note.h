@@ -4,7 +4,7 @@
 
 namespace model {
 
-enum class Note {
+enum class NoteFrequency {
     C2,
     C2Sharp,
     D2,
@@ -67,6 +67,28 @@ enum class Note {
     B6,
 };
 
-std::string to_string(Note note);
+std::string to_string(NoteFrequency note);
+
+class Note {
+public:
+    Note() = default;
+    Note(
+        NoteFrequency frequency,
+        size_t duration,
+        size_t instrument_index);
+
+    NoteFrequency frequency() const;
+    size_t duration() const;
+    size_t instrumentIndex() const;
+
+    void setFrequency(NoteFrequency frequency);
+    void setDuration(size_t duration);
+    void setInstrumentIndex(size_t instrument_index);
+
+private:
+    NoteFrequency m_frequency;
+    size_t m_duration;
+    size_t m_instrument_index;
+};
 
 }

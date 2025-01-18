@@ -21,15 +21,12 @@ static void savePhrases(
         for (auto note_index = 0u; note_index < model::Phrase::NOTE_COUNT; ++note_index) {
             const auto note_value = phrase.note(note_index);
             if (note_value.has_value()) {
-                json_note["note"] = static_cast<int>(
-                    *note_value);
+                json_note["frequency"] = note_value->frequency();
+                json_note["duration"] = note_value->duration();
+                json_note["instrument_index"] = note_value->instrumentIndex();
             } else {
-                json_note["note"] = nullptr;
-            }
-            const auto instrument_index = phrase.instrumentIndex(note_index);
-            if (instrument_index.has_value()) {
-                json_note["instrument_index"] = *instrument_index;
-            } else {
+                json_note["frequency"] = nullptr;
+                json_note["duration"] = nullptr;
                 json_note["instrument_index"] = nullptr;
             }
             json_phrase.push_back(json_note);

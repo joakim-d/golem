@@ -8,7 +8,6 @@ namespace model {
 class Chain;
 class Phrase;
 class Song;
-enum class Note;
 }
 
 class IAudioProcessingUnit;
@@ -29,7 +28,6 @@ public:
 
     ~SongPlayer();
 
-    void playNote(model::Note note, size_t instrument_index);
     void playSong();
     void stop();
 

@@ -20,7 +20,7 @@ NotePlayer::NotePlayer(
 void NotePlayer::play(
     Channel channel,
     size_t instrument_index,
-    std::optional<model::Note> note)
+    std::optional<model::NoteFrequency> note)
 {
     auto& instrument = m_song_model->getInstrument(instrument_index);
     switch (channel) {
@@ -38,9 +38,27 @@ void NotePlayer::play(
     }
 }
 
+void NotePlayer::stop(
+    Channel channel)
+{
+    switch (channel) {
+    case Channel::Channel1:
+        stopChannel1();
+        break;
+    case Channel::Channel2:
+        stopChannel2();
+        break;
+    case Channel::Channel3:
+        stopChannel3();
+        break;
+    default:
+        break;
+    }
+}
+
 void NotePlayer::setChannel1Instrument(
     const model::PulseInstrument& pulse,
-    std::optional<model::Note> note)
+    std::optional<model::NoteFrequency> note)
 {
     const uint8_t register_10
         = (pulse.sweepPace() << 4)
@@ -73,7 +91,6 @@ void NotePlayer::setChannel1Instrument(
 
         const auto register_14
             = 0x80
-            | (pulse.lengthEnable() << 6)
             | (period >> 8);
 
         m_audio_processing_unit->updateRegister(
@@ -81,7 +98,7 @@ void NotePlayer::setChannel1Instrument(
             register_14);
     } else {
         const auto register_14
-            = (pulse.lengthEnable() << 6);
+            = 0;
 
         m_audio_processing_unit->updateRegister(
             Register::NR14,
@@ -92,7 +109,7 @@ void NotePlayer::setChannel1Instrument(
 
 void NotePlayer::setChannel2Instrument(
     const model::PulseInstrument& pulse,
-    std::optional<model::Note> note)
+    std::optional<model::NoteFrequency> note)
 {
     const uint8_t register_21
         = ((unsigned)pulse.dutyCycle() << 6)
@@ -117,15 +134,13 @@ void NotePlayer::setChannel2Instrument(
 
         const auto register_24
             = 0x80
-            | (pulse.lengthEnable() << 6)
             | (period >> 8);
 
         m_audio_processing_unit->updateRegister(
             Register::NR24,
             register_24);
     } else {
-        const auto register_24
-            = (pulse.lengthEnable() << 6);
+        const auto register_24 = 0;
 
         m_audio_processing_unit->updateRegister(
             Register::NR24,
@@ -136,7 +151,7 @@ void NotePlayer::setChannel2Instrument(
 
 void NotePlayer::setChannel3Instrument(
     const model::WaveInstrument& wave,
-    std::optional<model::Note> note)
+    std::optional<model::NoteFrequency> note)
 {
     // ugly comparison, should we try to compare by instrument index ?
     if (wave != m_wave) {
@@ -167,12 +182,35 @@ void NotePlayer::setChannel3Instrument(
 
         const uint8_t nr34
             = 0x80
-            | (wave.lengthEnable() << 6)
             | (period >> 8);
 
         m_audio_processing_unit->updateRegister(
             Register::NR34, nr34);
     }
+}
+
+void NotePlayer::stopChannel1()
+{
+    const uint8_t register_12 = 0; // Set initial volume to 0, decrease env dir so the sound is muted
+    const uint8_t register_14 = 0x80; // Trigger
+    m_audio_processing_unit->updateRegister(Register::NR12, register_12);
+    m_audio_processing_unit->updateRegister(Register::NR14, register_14);
+}
+
+void NotePlayer::stopChannel2()
+{
+    const uint8_t register_22 = 0; // Set initial volume to 0, decrease env dir so the sound is muted
+    const uint8_t register_24 = 0x80; // Trigger
+    m_audio_processing_unit->updateRegister(Register::NR22, register_22);
+    m_audio_processing_unit->updateRegister(Register::NR24, register_24);
+}
+
+void NotePlayer::stopChannel3()
+{
+    const uint8_t register_32 = 0; // Set initial volume to 0, decrease env dir so the sound is muted
+    const uint8_t register_34 = 0x80; // Trigger
+    m_audio_processing_unit->updateRegister(Register::NR32, register_32);
+    m_audio_processing_unit->updateRegister(Register::NR34, register_34);
 }
 
 }

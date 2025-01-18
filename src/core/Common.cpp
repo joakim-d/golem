@@ -153,12 +153,12 @@ static unsigned WAVE_PERIODS[] = {
 
 }
 
-unsigned noteToPulsePeriod(model::Note note)
+unsigned noteToPulsePeriod(model::NoteFrequency note)
 {
     return PULSE_PERIODS[(unsigned)note];
 }
 
-unsigned noteToWavePeriod(model::Note note)
+unsigned noteToWavePeriod(model::NoteFrequency note)
 {
     return WAVE_PERIODS[(unsigned)note];
 }

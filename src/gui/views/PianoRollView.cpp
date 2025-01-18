@@ -105,7 +105,11 @@ PianoRollView::PianoRollView(
 
     view_widget.onPressed(ecs::Button::Left, [this](ecs::Button, int x, int y) {
         size_t note = ((viewHeight() - y - m_y_offset) / BLACK_KEY_HEIGHT);
-        m_note_player->play(Channel::Channel1, 0, model::Note(note));
+        m_note_player->play(Channel::Channel2, 0, model::NoteFrequency(note));
+    });
+
+    view_widget.onReleased(ecs::Button::Left, [this](ecs::Button, int, int) {
+        m_note_player->stop(Channel::Channel2);
     });
 }
 

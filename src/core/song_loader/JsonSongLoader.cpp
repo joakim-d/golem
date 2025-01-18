@@ -51,13 +51,16 @@ static void loadPhrases(
         auto& phrase_model = song.getPhrase(phrase_index);
         size_t note_index = 0;
         for (const auto& note : phrase) {
-            const auto note_value = getJsonValue<model::Note>(note, "note");
+            const auto frequency = getJsonValue<model::NoteFrequency>(note, "frequency");
             const auto instrument_index = getJsonValue<size_t>(note, "instrument_index");
-            if (note_value) {
-                phrase_model.setNote(note_index, *note_value);
-            }
-            if (instrument_index) {
-                phrase_model.setInstrumentIndex(note_index, *instrument_index);
+            const auto duration = getJsonValue<size_t>(note, "duration");
+            if (frequency && instrument_index && duration) {
+                phrase_model.setNote(
+                    note_index,
+                    model::Note {
+                        *frequency,
+                        *duration,
+                        *instrument_index });
             }
             ++note_index;
             if (note_index == model::Phrase::NOTE_COUNT) {

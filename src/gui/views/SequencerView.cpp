@@ -41,9 +41,11 @@ SequencerView::SequencerView(
     std::shared_ptr<model::Song> song_model)
     : m_sequencer_widget(sequencer_view_widget)
     , m_progression_bar_widget(progression_bar_widget)
+    , m_current_track_index(0)
     , m_x_offset(0)
     , m_y_offset(0)
-    , m_current_track_index(0)
+    , m_last_note_index(0)
+    , m_last_phrase_index(0)
 {
     sequencer_view_widget.onDraw(
         [sequencer_view_widget, this, song_model](
@@ -84,21 +86,29 @@ SequencerView::SequencerView(
 
             // Draw notes
             SDL_Rect rect;
-            rect.w = CELL_WIDTH;
             rect.h = CELL_HEIGHT;
             for (int i = 0; i < draw_cells_on_row; i++) {
                 const int current_phrase = (i + start_i) / NOTES_BY_PHRASE;
                 const int current_note_index = (i + start_i) % NOTES_BY_PHRASE;
 
-                auto phrase_index = song_model->getTrack(m_current_track_index).phraseIndex(current_phrase);
+                auto phrase_index
+                    = song_model->getTrack(
+                                    m_current_track_index)
+                          .phraseIndex(current_phrase);
                 if (!phrase_index.has_value())
                     continue;
 
-                const auto note = song_model->getPhrase(*phrase_index).note(current_note_index);
+                const auto note
+                    = song_model->getPhrase(
+                                    *phrase_index)
+                          .note(current_note_index);
+
                 if (!note.has_value())
                     continue;
+
                 rect.x = i * (CELL_WIDTH + CELL_SPACING) - start_x_offset;
-                rect.y = ((6 * 12 - int(*note)) - 1) * (CELL_HEIGHT + CELL_SPACING) - m_y_offset;
+                rect.y = ((6 * 12 - int(note->frequency())) - 1) * (CELL_HEIGHT + CELL_SPACING) - m_y_offset;
+                rect.w = (CELL_WIDTH + CELL_SPACING) * note->duration();
                 painter.fillRectangle(rect, graphics::core::Color::fromHexa("#ff0000"));
             }
         });

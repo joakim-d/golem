@@ -2,5 +2,5 @@
 
 #include <model/Note.h>
 
-unsigned noteToPulsePeriod(model::Note note);
-unsigned noteToWavePeriod(model::Note note);
+unsigned noteToPulsePeriod(model::NoteFrequency note);
+unsigned noteToWavePeriod(model::NoteFrequency note);
