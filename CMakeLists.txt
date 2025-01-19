@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+include(DirectoryCopy)
+
 add_subdirectory(
     submodules/json
 )
@@ -18,6 +20,7 @@ find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.h")
+file(GLOB_RECURSE RESOURCES "resources/*")
 
 if(ENABLE_ASAN)
     add_compile_options("-fsanitize=address")
@@ -27,6 +30,7 @@ endif()
 add_executable(
     golem
     ${SOURCES}
+    ${RESOURCES}
 )
 
 target_include_directories(
@@ -42,6 +46,11 @@ target_link_libraries(
     SDL2::Image
     SDL2::TTF
     nlohmann_json::nlohmann_json
+)
+
+directory_copy(
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources
+    ${CMAKE_CURRENT_BINARY_DIR}/resources
 )
 
 include(GNUInstallDirs)

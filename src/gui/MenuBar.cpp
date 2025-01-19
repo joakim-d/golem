@@ -1,5 +1,7 @@
 #include <gui/MenuBar.h>
 
+#include <gui/style/Style.h>
+
 #include <graphics/GraphicsFactory.h>
 
 namespace gui {
@@ -10,27 +12,27 @@ MenuBar::MenuBar(
 {
     using Color = graphics::core::Color;
     auto new_button
-        = graphics_factory.createWidget("New Button")
+        = graphics_factory
+              .createImage(Style::imagePath(Style::Image::NewSong))
               .addSize(32, 32)
-              .addFill(Color { 255, 0, 0 })
               .anchorLeft(entity, ecs::Left);
 
     auto open_button
-        = graphics_factory.createWidget("Open Button")
+        = graphics_factory
+              .createImage(Style::imagePath(Style::Image::OpenSong))
               .addSize(32, 32)
-              .addFill(Color { 255, 0, 0 })
               .anchorLeft(new_button.entity, ecs::Right, 1);
 
     auto save_button
-        = graphics_factory.createWidget("Save Button")
+        = graphics_factory
+              .createImage(Style::imagePath(Style::Image::LoadSong))
               .addSize(32, 32)
-              .addFill(Color { 255, 0, 0 })
               .anchorLeft(open_button.entity, ecs::Right, 1);
 
     auto export_button
-        = graphics_factory.createWidget("Export Button")
+        = graphics_factory
+              .createImage(Style::imagePath(Style::Image::ExportSong))
               .addSize(32, 32)
-              .addFill(Color { 255, 0, 0 })
               .anchorLeft(save_button.entity, ecs::Right, 1);
 }
 

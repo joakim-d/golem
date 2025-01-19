@@ -1,13 +1,12 @@
 #pragma once
 
+#include <graphics/Texture.h>
+
 #include <SDL2/SDL.h>
 
-#include <cstddef>
 #include <vector>
 
 namespace graphics {
-
-using Texture = size_t;
 
 class TextureManager {
 public:
