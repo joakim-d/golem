@@ -42,7 +42,7 @@ MainView::MainView(
               .addFill(graphics::core::Color { 255, 0, 0, 32 }),
           song_model)
     , m_x_offset(0)
-    , m_y_offset(0)
+    , m_y_offset(m_piano_roll_view.viewHeight() / 2)
 {
     struct PressTracking {
         bool pressed;
@@ -102,6 +102,10 @@ MainView::MainView(
         [press_tracking](ecs::Button, int x, int y) {
             press_tracking->pressed = false;
         });
+
+    m_sequencer_view.setOffsets(m_x_offset, m_y_offset);
+    m_sequencer_header_view.setXOffset(m_x_offset);
+    m_piano_roll_view.setYOffset(m_y_offset);
 }
 
 void MainView::onProgressionChanged(

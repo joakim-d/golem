@@ -22,6 +22,7 @@ namespace graphics {
 
 class Widget {
     friend class GraphicsFactory;
+    friend class ImageFactory;
     friend class LabelFactory;
 
 public:

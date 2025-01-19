@@ -9,6 +9,8 @@ GraphicsFactory::GraphicsFactory(
     , m_texture_manager(renderer)
     , m_font_manager()
     , m_label_factory(m_font_manager, m_texture_manager, entity_manager)
+    , m_image_manager(m_texture_manager)
+    , m_image_factory(m_image_manager, m_texture_manager, entity_manager)
 {
 }
 
@@ -28,6 +30,11 @@ Widget GraphicsFactory::createLabel(
         font_path,
         point_size,
         color);
+}
+
+Widget GraphicsFactory::createImage(std::filesystem::path image_path)
+{
+    return *m_image_factory.createImage(image_path);
 }
 
 const TextureManager& GraphicsFactory::textureManager() const

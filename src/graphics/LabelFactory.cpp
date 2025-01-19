@@ -59,7 +59,6 @@ std::optional<Widget> LabelFactory::createLabel(
     auto entity
         = graphics::Widget::createEntity("label", m_entity_manager)
               .addSize(width, height)
-              .addPosition(0, 0)
               .addTexture(texture);
 
     return entity;
