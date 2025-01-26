@@ -6,6 +6,8 @@
 #include <graphics/GraphicsFactory.h>
 #include <graphics/Widget.h>
 
+#include <model/Song.h>
+
 #include <memory>
 
 namespace gui::views {
@@ -33,6 +35,7 @@ SongView::SongView(
                             .addFill(graphics::core::Color { 255, 0, 0, 128 })
                             .addZPosition(1))
     , m_x_offset(0)
+    , m_song_model(song_model)
 {
     const auto song_view_entity = song_view_widget.entity;
     const auto firstColor = graphics::core::Color::fromHexa("#111111");
@@ -50,7 +53,7 @@ SongView::SongView(
               .anchorLeft(song_view_entity, ecs::Left)
               .addZPosition(Z_POSITION_OFFSET + 1);
 
-    ecs::Entity previousEntity = header_first_cell.entity;
+    ecs::Entity previous_entity = header_first_cell.entity;
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
@@ -65,7 +68,7 @@ SongView::SongView(
                 widget.addPosition(65 + (128 * i) - m_x_offset, 0);
             });
 
-        previousEntity = current_widget.entity;
+        previous_entity = current_widget.entity;
 
         graphics_factory
             .createLabel(
@@ -73,8 +76,8 @@ SongView::SongView(
                 12,
                 Style::fontPath(),
                 Style::defaultColor())
-            .anchorTop(previousEntity, ecs::Top, 0)
-            .anchorLeft(previousEntity, ecs::Left, 62);
+            .anchorTop(previous_entity, ecs::Top, 0)
+            .anchorLeft(previous_entity, ecs::Left, 62);
     }
 
     // Pulse row
@@ -92,7 +95,7 @@ SongView::SongView(
         .anchorLeft(pulse_first_cell.entity, ecs::Left, 8)
         .addZPosition(Z_POSITION_OFFSET + 2);
 
-    previousEntity = pulse_first_cell.entity;
+    previous_entity = pulse_first_cell.entity;
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
@@ -101,7 +104,7 @@ SongView::SongView(
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
-            .anchorTop(previousEntity, ecs::Top)
+            .anchorTop(previous_entity, ecs::Top)
             .addPosition(65 + (128 * i), 0)
             .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
@@ -119,7 +122,7 @@ SongView::SongView(
             i
         };
 
-        previousEntity = current_widget.entity;
+        previous_entity = current_widget.entity;
     }
 
     // Pulse 2 row
@@ -137,7 +140,7 @@ SongView::SongView(
         .anchorLeft(pulse_2_first_cell.entity, ecs::Left, 8)
         .addZPosition(Z_POSITION_OFFSET + 2);
 
-    previousEntity = pulse_2_first_cell.entity;
+    previous_entity = pulse_2_first_cell.entity;
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
@@ -146,7 +149,7 @@ SongView::SongView(
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
-            .anchorTop(previousEntity, ecs::Top)
+            .anchorTop(previous_entity, ecs::Top)
             .addPosition(65 + (128 * i), 0)
             .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
@@ -164,7 +167,7 @@ SongView::SongView(
             i
         };
 
-        previousEntity = current_widget.entity;
+        previous_entity = current_widget.entity;
     }
 
     // Wave row
@@ -182,7 +185,7 @@ SongView::SongView(
         .anchorLeft(wave_first_cell.entity, ecs::Left, 8)
         .addZPosition(Z_POSITION_OFFSET + 2);
 
-    previousEntity = wave_first_cell.entity;
+    previous_entity = wave_first_cell.entity;
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
@@ -191,7 +194,7 @@ SongView::SongView(
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
-            .anchorTop(previousEntity, ecs::Top)
+            .anchorTop(previous_entity, ecs::Top)
             .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
                 widget.addPosition(65 + (128 * i) - m_x_offset, 0);
@@ -208,7 +211,7 @@ SongView::SongView(
             i
         };
 
-        previousEntity = current_widget.entity;
+        previous_entity = current_widget.entity;
     }
 
     // Pulse 2 row
@@ -226,7 +229,7 @@ SongView::SongView(
         .anchorLeft(noise_first_cell.entity, ecs::Left, 8)
         .addZPosition(Z_POSITION_OFFSET + 2);
 
-    previousEntity = noise_first_cell.entity;
+    previous_entity = noise_first_cell.entity;
 
     for (size_t i = 0; i < 16; ++i) {
         auto current_widget
@@ -235,7 +238,7 @@ SongView::SongView(
         current_widget
             .addFill(i % 2 == 0 ? firstColor : secondColor)
             .addSize(128, 48)
-            .anchorTop(previousEntity, ecs::Top)
+            .anchorTop(previous_entity, ecs::Top)
             .addUpdateCallback([current_widget, i, this]() {
                 auto widget = current_widget;
                 widget.addPosition(65 + (128 * i) - m_x_offset, 0);
@@ -251,7 +254,7 @@ SongView::SongView(
             3,
             i
         };
-        previousEntity = current_widget.entity;
+        previous_entity = current_widget.entity;
     }
 
     auto mouse_state = std::make_shared<MouseState>();
@@ -288,10 +291,13 @@ SongView::SongView(
 }
 
 void SongView::onProgressionChanged(
-    size_t note_index, size_t phrase_index)
+    size_t tick_index,
+    size_t note_index,
+    size_t phrase_index)
 {
     m_progression_bar
         .addPosition(65
+                + (double(tick_index) / double(m_song_model->ticksPerNote())) * NOTE_WIDTH
                 + (phrase_index * PHRASE_WIDTH)
                 + (NOTE_WIDTH * note_index) - m_x_offset,
             0);

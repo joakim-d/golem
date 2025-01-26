@@ -109,10 +109,12 @@ MainView::MainView(
 }
 
 void MainView::onProgressionChanged(
+    size_t tick_index,
     size_t note_index,
     size_t phrase_index)
 {
     m_sequencer_view.onProgressionChanged(
+        tick_index,
         note_index,
         phrase_index);
 }

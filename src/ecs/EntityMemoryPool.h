@@ -48,7 +48,9 @@ public:
     size_t maxEntitiesSize() const;
 
     std::optional<Entity> addEntity(
-        const std::string& tag);
+        std::string tag);
+
+    void removeEntity(Entity entity);
 
     template <typename ComponentData>
     void addComponent(Entity entity, ComponentData data)

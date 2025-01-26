@@ -22,7 +22,7 @@ size_t EntityMemoryPool::maxEntitiesSize() const
 }
 
 std::optional<Entity> EntityMemoryPool::addEntity(
-    const std::string& tag)
+    std::string tag)
 {
     Entity entity;
     for (entity = m_next_inserted; entity < m_max_entities; ++entity) {
@@ -34,12 +34,21 @@ std::optional<Entity> EntityMemoryPool::addEntity(
                 },
                 m_pool);
             m_active[entity] = true;
+            m_tags[entity] = std::move(tag);
             m_next_inserted = entity + 1;
             return entity;
         }
     }
 
     return std::nullopt;
+}
+
+void EntityMemoryPool::removeEntity(Entity entity)
+{
+    m_active[entity] = false;
+    if (entity < m_next_inserted) {
+        m_next_inserted = entity;
+    }
 }
 
 }

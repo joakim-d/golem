@@ -3,6 +3,7 @@
 #include <gui/MenuBar.h>
 #include <gui/PlayProgressionTracker.h>
 #include <gui/style/Style.h>
+#include <gui/views/ConfigurationView.h>
 #include <gui/views/MainView.h>
 #include <gui/views/SongView.h>
 
@@ -107,11 +108,26 @@ int MainWindow::execute()
 
     gui::MenuBar menu_bar(graphics_factory, menu_bar_widget.entity);
 
+    auto configuration_widget
+        = graphics_factory.createWidget("configuration_widget")
+              .anchorTop(menu_bar_widget.entity, ecs::Bottom)
+              .anchorRight(window_entity, ecs::Right)
+              .anchorBottom(window_entity, ecs::Bottom)
+              .addSize(256, 0)
+              .addZPosition(30)
+              .addFill(graphics::core::Color::fromHexa("#333333"));
+
+    gui::views::ConfigurationView configuration_view {
+        graphics_factory,
+        configuration_widget,
+        song_model
+    };
+
     auto song_view_widget
         = graphics_factory.createWidget("song_view")
               .addSize(0, 48 * 4 + 16 + 4) // 48 pixels per track + 16 pixels for header + 4 pixels for spacing
               .anchorLeft(window_entity, ecs::Left)
-              .anchorRight(window_entity, ecs::Right)
+              .anchorRight(configuration_widget.entity, ecs::Left, 1)
               .anchorTop(menu_bar_widget.entity, ecs::Bottom);
 
     gui::views::SongView song_view {
@@ -124,7 +140,7 @@ int MainWindow::execute()
         = graphics_factory.createWidget("main_widget")
               .anchorTop(song_view_widget.entity, ecs::Bottom, 1)
               .anchorLeft(window_entity, ecs::Left)
-              .anchorRight(window_entity, ecs::Right)
+              .anchorRight(configuration_widget.entity, ecs::Left, 1)
               .anchorBottom(window_entity, ecs::Bottom);
 
     auto note_player = std::make_shared<core::NotePlayer>(

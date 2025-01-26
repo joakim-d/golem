@@ -3,6 +3,7 @@
 namespace model {
 
 Song::Song()
+    : m_ticks_per_note(12)
 {
 }
 
@@ -76,6 +77,11 @@ const Instrument& Song::getInstrument(size_t index) const
 const Track& Song::getTrack(size_t index) const
 {
     return m_tracks[index];
+}
+
+size_t Song::ticksPerNote() const
+{
+    return m_ticks_per_note;
 }
 
 }

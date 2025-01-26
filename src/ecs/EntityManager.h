@@ -13,7 +13,9 @@ class EntityManager {
 public:
     EntityManager(EntityMemoryPool& memory_pool);
 
-    std::optional<Entity> addEntity(const std::string& tag);
+    std::optional<Entity> addEntity(std::string tag);
+
+    void removeEntity(Entity entity);
 
     const std::vector<Entity>& entities() const;
 

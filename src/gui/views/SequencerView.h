@@ -27,15 +27,20 @@ public:
     int viewWidth() const;
 
     void setCurrentTrackIndex(size_t track_index);
-    void onProgressionChanged(size_t note_index, size_t phrase_index);
+    void onProgressionChanged(
+        size_t tick_index,
+        size_t note_index,
+        size_t phrase_index);
 
 private:
     void updateProgressionBar();
     graphics::Widget m_sequencer_widget;
     graphics::Widget m_progression_bar_widget;
+    std::shared_ptr<model::Song> m_song_model;
     size_t m_current_track_index;
     int m_x_offset;
     int m_y_offset;
+    size_t m_last_tick_index;
     size_t m_last_note_index;
     size_t m_last_phrase_index;
 };

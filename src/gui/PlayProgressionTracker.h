@@ -15,7 +15,7 @@ public:
         views::SongView& song_view,
         views::MainView& main_view);
 
-    void onProgressMade(size_t note_index, size_t phrase_index) override;
+    void onProgressMade(size_t tick_index, size_t note_index, size_t phrase_index) override;
 
 private:
     views::SongView& m_song_view;

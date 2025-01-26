@@ -70,7 +70,7 @@ void AnchoringSystem::update(
             position.x = getXPosition(pool, anchorLeft.entity, anchorLeft.anchorTo) + anchorLeft.margin;
         } else if (hasRight) {
             const auto& anchorRight = pool.getComponent<AnchorRight>(entity);
-            position.x = getXPosition(pool, anchorRight.entity, anchorRight.anchorTo) - anchorRight.margin - size.h;
+            position.x = getXPosition(pool, anchorRight.entity, anchorRight.anchorTo) - anchorRight.margin - size.w;
         }
     }
 }

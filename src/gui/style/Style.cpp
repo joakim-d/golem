@@ -26,6 +26,8 @@ std::filesystem::path Style::imagePath(Style::Image image_id)
         "./resources/images/Open@2x.png",
         "./resources/images/Save@2x.png",
         "./resources/images/Export@2x.png",
+        "./resources/images/EffectDutyCycle@2x.png",
+        "./resources/images/MenuDelete@4x.png"
     };
 
     return image_paths[(size_t)image_id];

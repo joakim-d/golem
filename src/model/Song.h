@@ -21,6 +21,8 @@ public:
     Song();
 
     size_t beatsPerMinute() const;
+    void setTicksPerNote(size_t ticks);
+    size_t ticksPerNote() const;
 
     void visitInstruments(const std::function<void(Instrument&)>& callback);
     void visitInstruments(const std::function<void(const Instrument&)>& callback) const;
@@ -39,6 +41,7 @@ public:
 
 private:
     size_t m_beats_per_minutes;
+    size_t m_ticks_per_note;
     std::array<Instrument, INSTRUMENT_COUNT> m_instruments;
     std::array<Phrase, PHRASE_COUNT> m_phrases;
     std::array<Track, TRACK_COUNT> m_tracks;
