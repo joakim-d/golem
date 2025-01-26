@@ -41,6 +41,7 @@ void SongPlayer::playSong(const model::Song& song)
     struct PlayStatus {
         size_t currentPhrase = 0;
         size_t currentNote = 0;
+        size_t currentTick = 0;
         size_t durationLeft = 0;
         bool stopped = false;
     };
@@ -57,6 +58,12 @@ void SongPlayer::playSong(const model::Song& song)
             auto& status = statuses[track_index];
             if (status.stopped)
                 continue;
+
+            status.currentTick++;
+            if (status.currentTick != m_song->ticksPerNote()) {
+                continue;
+            }
+            status.currentTick = 0;
 
             const auto& track = song.getTrack(track_index);
             const auto& phrase_index = track.phraseIndex(status.currentPhrase);
@@ -96,7 +103,8 @@ void SongPlayer::playSong(const model::Song& song)
             }
             status.stopped = true;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds { 200 });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds { 1000 / 60 });
         if (!m_stop) {
             bool quit = true;
             for (size_t track_index = 0; track_index < model::Song::TRACK_COUNT; ++track_index) {
@@ -106,9 +114,19 @@ void SongPlayer::playSong(const model::Song& song)
             }
             m_stop = quit;
         }
+        globalStatus.currentTick++;
+        if (globalStatus.currentTick != m_song->ticksPerNote()) {
+            m_playing_progression_tracker->onProgressMade(
+                globalStatus.currentTick,
+                globalStatus.currentNote,
+                globalStatus.currentPhrase);
+            continue;
+        }
+        globalStatus.currentTick = 0;
         globalStatus.currentNote++;
         if (globalStatus.currentNote != model::Phrase::NOTE_COUNT) {
             m_playing_progression_tracker->onProgressMade(
+                globalStatus.currentTick,
                 globalStatus.currentNote,
                 globalStatus.currentPhrase);
             continue;
@@ -116,6 +134,7 @@ void SongPlayer::playSong(const model::Song& song)
         globalStatus.currentPhrase++;
         globalStatus.currentNote = 0;
         m_playing_progression_tracker->onProgressMade(
+            globalStatus.currentTick,
             globalStatus.currentNote,
             globalStatus.currentPhrase);
     }

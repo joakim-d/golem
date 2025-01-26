@@ -99,6 +99,7 @@ void UserInputSystem::update(
                             Button::Middle,
                             m_mouse.x - position.x,
                             m_mouse.y - position.y);
+                        return;
                     }
                 }
                 break;
@@ -157,7 +158,7 @@ void UserInputSystem::lookForEntitiesPressed(
     EntityMemoryPool& pool)
 {
     ecs::Entity entity_pressed = 0;
-    int previous_z = -10000;
+    int previous_z = std::numeric_limits<int>::min();
     for (auto entity : entities) {
         const auto& position = pool.getComponent<Position>(entity);
         const auto& size = pool.getComponent<Size>(entity);
@@ -167,5 +168,26 @@ void UserInputSystem::lookForEntitiesPressed(
         }
         entities_pressed.push_back(entity);
     }
+
+    std::sort(
+        entities_pressed.begin(),
+        entities_pressed.end(),
+        [&pool](Entity left, Entity right) {
+            int z_left
+                = pool.hasComponent<ZPositionComponent>(left)
+                ? pool.getComponent<ZPosition>(left).z
+                : 0;
+
+            int z_right
+                = pool.hasComponent<ZPositionComponent>(right)
+                ? pool.getComponent<ZPosition>(right).z
+                : 0;
+
+            if (z_left == z_right) {
+                return left > right;
+            }
+
+            return z_left > z_right;
+        });
 }
 }

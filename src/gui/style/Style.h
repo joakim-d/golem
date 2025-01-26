@@ -12,7 +12,9 @@ public:
         NewSong,
         OpenSong,
         LoadSong,
-        ExportSong
+        ExportSong,
+        Pulse,
+        Close
     };
 
     static std::filesystem::path fontPath();

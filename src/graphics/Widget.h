@@ -79,10 +79,13 @@ public:
     Widget& onDraw(
         std::function<void(graphics::Painter& painter)> draw_callback);
 
+    void die();
+
     int width() const;
     int height() const;
     int x() const;
     int y() const;
+    int z() const;
 
     const ecs::Entity entity;
 

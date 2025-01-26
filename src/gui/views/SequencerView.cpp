@@ -41,6 +41,7 @@ SequencerView::SequencerView(
     std::shared_ptr<model::Song> song_model)
     : m_sequencer_widget(sequencer_view_widget)
     , m_progression_bar_widget(progression_bar_widget)
+    , m_song_model(song_model)
     , m_current_track_index(0)
     , m_x_offset(0)
     , m_y_offset(0)
@@ -132,9 +133,11 @@ void SequencerView::setCurrentTrackIndex(size_t track_index)
 }
 
 void SequencerView::onProgressionChanged(
+    size_t tick_index,
     size_t note_index,
     size_t phrase_index)
 {
+    m_last_tick_index = tick_index;
     m_last_note_index = note_index;
     m_last_phrase_index = phrase_index;
     updateProgressionBar();
@@ -144,6 +147,7 @@ void SequencerView::updateProgressionBar()
 {
     const int sequencer_widget_x = m_sequencer_widget.x();
     const int x_position = sequencer_widget_x
+        + (double(m_last_tick_index) / double(m_song_model->ticksPerNote())) * CELL_WIDTH
         + m_last_phrase_index * PHRASE_WIDTH
         + (m_last_note_index * (CELL_WIDTH + CELL_SPACING))
         - m_x_offset;

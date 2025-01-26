@@ -28,7 +28,10 @@ public:
 
     void setCurrentTrackIndex(size_t track_index);
 
-    void onProgressionChanged(size_t phrase_index, size_t note_index);
+    void onProgressionChanged(
+        size_t tick_index,
+        size_t phrase_index,
+        size_t note_index);
 
 private:
     PianoRollView m_piano_roll_view;

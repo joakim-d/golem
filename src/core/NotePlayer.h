@@ -27,22 +27,22 @@ public:
     void play(
         Channel channel,
         size_t instrument_index,
-        std::optional<model::NoteFrequency> note);
+        model::NoteFrequency note);
 
     void stop(Channel channel);
 
 private:
     void setChannel1Instrument(
         const model::PulseInstrument& pulse,
-        std::optional<model::NoteFrequency> note);
+        model::NoteFrequency note);
 
     void setChannel2Instrument(
         const model::PulseInstrument& pulse,
-        std::optional<model::NoteFrequency> note);
+        model::NoteFrequency note);
 
     void setChannel3Instrument(
         const model::WaveInstrument& wave,
-        std::optional<model::NoteFrequency> note);
+        model::NoteFrequency note);
 
     void stopChannel1();
     void stopChannel2();

@@ -20,7 +20,7 @@ Widget Widget::createEntity(
     std::string name,
     ecs::EntityManager& manager)
 {
-    auto entity = manager.addEntity(name);
+    auto entity = manager.addEntity(std::move(name));
     Widget widget { *entity, manager };
     widget.addPosition(0, 0)
         .addSize(0, 0);
@@ -125,6 +125,16 @@ Widget& Widget::onPositionChanged(
     return *this;
 }
 
+Widget& Widget::fill(
+    ecs::Entity entity,
+    int margin)
+{
+    return anchorTop(entity, ecs::Top, margin)
+        .anchorLeft(entity, ecs::Left, margin)
+        .anchorRight(entity, ecs::Right, margin)
+        .anchorBottom(entity, ecs::Bottom, margin);
+}
+
 Widget& Widget::anchorTop(
     ecs::Entity entity,
     ecs::VerticalPosition positionToAnchor,
@@ -200,6 +210,11 @@ Widget& Widget::onDraw(std::function<void(graphics::Painter& painter)> draw_call
     return *this;
 }
 
+void Widget::die()
+{
+    m_manager.removeEntity(entity);
+}
+
 int Widget::width() const
 {
     return m_manager
@@ -229,6 +244,14 @@ int Widget::y() const
         .getComponent<ecs::Position>(
             entity)
         .y;
+}
+
+int Widget::z() const
+{
+    return m_manager
+        .getComponent<ecs::ZPosition>(
+            entity)
+        .z;
 }
 
 }
