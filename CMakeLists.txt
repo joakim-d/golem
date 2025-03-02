@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(golem LANGUAGES CXX)
 
 option(ENABLE_ASAN "Enable address sanitizer" OFF)
+option(ENABLE_UNIT_TESTS "Enable unit test project" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,10 +28,12 @@ if(ENABLE_ASAN)
     add_link_options("-fsanitize=address")
 endif()
 
+add_subdirectory(lib/golem)
+
 add_executable(
-    golem
-    ${SOURCES}
-    ${RESOURCES}
+   golem
+   ${SOURCES}
+   ${RESOURCES}
 )
 
 target_include_directories(
@@ -42,11 +45,12 @@ target_include_directories(
 target_link_libraries(
     golem
     PRIVATE
-    SDL2::Main
-    SDL2::Image
-    SDL2::TTF
-    nlohmann_json::nlohmann_json
+    golem_lib
 )
+
+if(ENABLE_UNIT_TESTS)
+    add_subdirectory(test/unit)
+endif()
 
 directory_copy(
     ${CMAKE_CURRENT_SOURCE_DIR}/resources
@@ -54,7 +58,7 @@ directory_copy(
 )
 
 include(GNUInstallDirs)
-install(TARGETS golem
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+# install(TARGETS golem
+#     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+#     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+# )
