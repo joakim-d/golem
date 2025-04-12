@@ -12,10 +12,12 @@ add_library(
 target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
+    imgui
     SDL2::Main
-    SDL2::Image
-    SDL2::TTF
     nlohmann_json::nlohmann_json
+    GLEW
+    glfw
+    GL
 )
 
 target_include_directories(

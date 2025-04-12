@@ -12,7 +12,7 @@ GetTrack::GetTrack(domain::IProjectRepository& project_repository)
 {
 }
 
-const domain::Track* GetTrack::execute(size_t song_index, size_t track_index)
+const domain::Track* GetTrack::operator()(size_t song_index, size_t track_index)
 {
     auto song = m_project_repository.getProject().song(song_index);
 

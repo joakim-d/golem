@@ -5,8 +5,13 @@ namespace domain
 
 Project::Project()
 {
-    m_songs.push_back(Song {});
-    m_instruments.push_back(Instrument {});
+    Song song {};
+    song.setName("Song 1");
+    m_songs.push_back(std::move(song));
+
+    auto instrument = Instrument {};
+    instrument.setName("Instrument 1");
+    m_instruments.push_back(std::move(instrument));
 }
 
 void Project::addSong(Song song)
@@ -42,6 +47,11 @@ Instrument* Project::instrument(size_t index)
 const std::vector<Instrument>& Project::getInstruments() const
 {
     return m_instruments;
+}
+
+const std::vector<Song>& Project::getSongs() const
+{
+    return m_songs;
 }
 
 }

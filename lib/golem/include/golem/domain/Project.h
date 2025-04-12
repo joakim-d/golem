@@ -18,6 +18,7 @@ public:
     Instrument* instrument(size_t index);
 
     const std::vector<Instrument>& getInstruments() const;
+    const std::vector<Song>& getSongs() const;
 
 private:
     std::vector<Song> m_songs;

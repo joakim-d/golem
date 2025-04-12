@@ -10,15 +10,15 @@ class IProjectRepository;
 namespace use_cases
 {
 
-class GetNotesPerPhrase
+class GetTicksPerNote
 {
 public:
-    GetNotesPerPhrase(domain::IProjectRepository& project_repository);
+    GetTicksPerNote(domain::IProjectRepository& project_repository);
 
-    size_t operator()(size_t song_index);
+    unsigned int execute(size_t song_index);
 
 private:
     domain::IProjectRepository& m_project_repository;
 };
 
-} // namespace use_cases
+}

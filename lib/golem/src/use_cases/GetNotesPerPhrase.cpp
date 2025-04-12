@@ -12,7 +12,7 @@ GetNotesPerPhrase::GetNotesPerPhrase(
 {
 }
 
-size_t GetNotesPerPhrase::execute(size_t song_index)
+size_t GetNotesPerPhrase::operator()(size_t song_index)
 {
     auto song = m_project_repository.getProject().song(song_index);
     if (song == nullptr)

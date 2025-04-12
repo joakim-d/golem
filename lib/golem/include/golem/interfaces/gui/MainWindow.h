@@ -4,15 +4,12 @@
 #include <golem/use_cases/ProjectUseCases.h>
 #include <optional>
 
-extern "C"
-{
-    struct SDL_Window;
-}
-
 namespace domain
 {
 class Song;
 }
+
+struct GLFWwindow;
 
 namespace gui
 {
@@ -30,7 +27,7 @@ public:
 private:
     MainWindow() = default;
 
-    SDL_Window* m_window;
+    GLFWwindow* m_window;
 };
 
 }

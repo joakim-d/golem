@@ -17,6 +17,9 @@ public:
 
     Song();
 
+    const std::string& name() const;
+    void setName(std::string name);
+
     size_t notesCount() const;
 
     unsigned int notesPerPhrase() const;
@@ -31,6 +34,7 @@ public:
     const Track& getTrack(size_t index) const;
 
 private:
+    std::string m_name;
     size_t m_notes_count;
     unsigned int m_ticks_per_note;
     unsigned int m_notes_per_phrase;

@@ -16,9 +16,9 @@ add_subdirectory(
     submodules/json
 )
 
+add_subdirectory(submodules)
+
 find_package(SDL2 REQUIRED)
-find_package(SDL2_image REQUIRED)
-find_package(SDL2_ttf REQUIRED)
 
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.h")
 file(GLOB_RECURSE RESOURCES "resources/*")
@@ -27,6 +27,7 @@ if(ENABLE_ASAN)
     add_compile_options("-fsanitize=address")
     add_link_options("-fsanitize=address")
 endif()
+
 
 add_subdirectory(lib/golem)
 
