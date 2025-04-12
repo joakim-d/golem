@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include <string>
+
 namespace domain
 {
 class IProjectRepository;
@@ -10,15 +12,15 @@ class IProjectRepository;
 namespace use_cases
 {
 
-class GetNotesPerPhrase
+class SetInstrumentName
 {
 public:
-    GetNotesPerPhrase(domain::IProjectRepository& project_repository);
+    SetInstrumentName(domain::IProjectRepository& project_repository);
 
-    size_t operator()(size_t song_index);
+    void operator()(size_t instrument_index, std::string name);
 
 private:
     domain::IProjectRepository& m_project_repository;
 };
 
-} // namespace use_cases
+}

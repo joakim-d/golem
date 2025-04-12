@@ -17,10 +17,14 @@ AddInstrument::AddInstrument(
 
 void AddInstrument::execute()
 {
-    auto& project = m_project_repository.getProject();
-    project.addInstrument(domain::Instrument {});
+    domain::Instrument instrument {};
 
-    m_event_processor.publishEvent(domain::events::InstrumentsChanged {});
+    std::string name { "Instrument " };
+    name += std::to_string(
+        m_project_repository.getProject().getInstruments().size() + 1);
+
+    instrument.setName(name);
+    m_project_repository.getProject().addInstrument(instrument);
 }
 
 }

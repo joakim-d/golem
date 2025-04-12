@@ -55,6 +55,16 @@ unsigned int Song::ticksPerNote() const
     return m_ticks_per_note;
 }
 
+const std::string& Song::name() const
+{
+    return m_name;
+}
+
+void Song::setName(std::string name)
+{
+    m_name = std::move(name);
+}
+
 size_t Song::notesCount() const
 {
     return 256;

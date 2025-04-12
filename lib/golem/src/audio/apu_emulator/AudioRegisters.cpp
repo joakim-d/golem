@@ -6,6 +6,8 @@ using namespace domain;
 
 AudioRegisters::AudioRegisters()
 {
+    m_register_values.fill(0);
+    m_wave_ram.fill(0);
 }
 
 unsigned AudioRegisters::getChannel1SweepPace() const
