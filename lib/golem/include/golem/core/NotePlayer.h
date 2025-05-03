@@ -2,8 +2,8 @@
 
 #include <golem/domain/Channel.h>
 #include <golem/domain/Note.h>
+#include <golem/domain/instruments/Adsr.h>
 #include <golem/domain/instruments/WaveInstrument.h>
-
 #include <golem/utils/observable.h>
 
 #include <memory>
@@ -21,6 +21,23 @@ class WaveInstrument;
 
 namespace core
 {
+
+struct AdsrProgression
+{
+    enum State
+    {
+        Attack,
+        Delay,
+        Substain,
+        Release,
+        Off
+    };
+
+    uint8_t initial_volume[5]; // initial volumes for each state of ADSR
+    uint8_t adr_length[4];
+    uint8_t state; // 0 -> Attack, 1 Delay, etc...
+    uint8_t ticks;
+};
 
 class NotePlayer
 {
@@ -55,11 +72,12 @@ private:
     void stopChannel3();
 
     domain::IProjectRepository& m_project_repository;
+    std::shared_ptr<IAudioProcessingUnit> m_audio_processing_unit;
     size_t m_tick_counter;
     domain::NoteFrequency m_note;
-    std::shared_ptr<IAudioProcessingUnit> m_audio_processing_unit;
     domain::WaveInstrument m_wave;
     utils::observable_handle m_handle;
+    AdsrProgression m_adsr_progression;
 };
 
 }

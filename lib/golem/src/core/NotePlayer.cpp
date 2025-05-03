@@ -1,12 +1,12 @@
 #include <golem/core/NotePlayer.h>
 
+#include <golem/core/IAudioProcessingUnit.h>
 #include <golem/domain/IProjectRepository.h>
 #include <golem/domain/Project.h>
 #include <golem/domain/Register.h>
 #include <golem/domain/Song.h>
+#include <golem/domain/instruments/Adsr.h>
 #include <golem/domain/instruments/Instrument.h>
-
-#include <golem/core/IAudioProcessingUnit.h>
 
 #include <core/Common.h>
 
@@ -36,6 +36,18 @@ void NotePlayer::play(
     {
         return;
     }
+
+    const auto& adsr = instrument->adsr();
+    m_adsr_progression.state = AdsrProgression::Attack;
+    m_adsr_progression.adr_length[0] = adsr.attackLength();
+    m_adsr_progression.adr_length[1] = adsr.delayLength();
+    m_adsr_progression.adr_length[2] = 0;
+    m_adsr_progression.adr_length[3] = adsr.releaseLength();
+    m_adsr_progression.initial_volume[0] = adsr.attackVolume();
+    m_adsr_progression.initial_volume[1] = adsr.delayVolume();
+    m_adsr_progression.initial_volume[2] = adsr.subtainVolume();
+    m_adsr_progression.initial_volume[3] = adsr.releaseVolume();
+    m_adsr_progression.initial_volume[4] = 0; // Off volume
 
     switch (channel)
     {
@@ -75,19 +87,32 @@ void NotePlayer::stop(domain::Channel channel)
 
 void NotePlayer::tick()
 {
-    int arpeggio[] = { 0 };
+    if (m_adsr_progression.state == AdsrProgression::Off
+        || m_adsr_progression.state == AdsrProgression::Substain)
+    {
+        return;
+    }
 
-    const auto period = noteToPulsePeriod(domain::NoteFrequency {
-        int(domain::NoteFrequency(m_note))
-        + arpeggio
-            [m_tick_counter % (sizeof(arpeggio) / sizeof(arpeggio[0]))] });
+    if (m_adsr_progression.ticks + 1
+        >= m_adsr_progression.adr_length[m_adsr_progression.state])
+    {
+        m_adsr_progression.state++;
+        m_adsr_progression.ticks = 0;
 
-    m_audio_processing_unit->updateRegister(domain::NR13, period);
+        const uint8_t register_12
+            = (m_adsr_progression.initial_volume[m_adsr_progression.state]
+               << 4);
 
-    const auto register_14 = 0x80 | (period >> 8);
+        m_audio_processing_unit->updateRegister(
+            domain::Register::NR12, register_12);
 
-    m_audio_processing_unit->updateRegister(
-        domain::Register::NR14, register_14);
+        m_audio_processing_unit->updateRegister(
+            domain::Register::NR14, 0x80, 0x80);
+    }
+    else
+    {
+        m_adsr_progression.ticks++;
+    }
 
     m_tick_counter++;
 }
@@ -102,8 +127,8 @@ void NotePlayer::setChannel1Instrument(
     const uint8_t register_11
         = ((unsigned)pulse.dutyCycle() << 6) | (pulse.initialLengthTimer());
 
-    const uint8_t register_12 = (pulse.envelopeInitialVolume() << 4)
-        | (pulse.envelopeIncrease() << 3) | (pulse.envelopePace());
+    const uint8_t register_12
+        = (m_adsr_progression.initial_volume[AdsrProgression::Attack] << 4);
 
     m_audio_processing_unit->updateRegister(
         domain::Register::NR10, register_10);
@@ -185,13 +210,7 @@ void NotePlayer::setChannel3Instrument(
 
 void NotePlayer::stopChannel1()
 {
-    const uint8_t register_12
-        = 0; // Set initial volume to 0, decrease env dir so the sound is muted
-    const uint8_t register_14 = 0x80; // Trigger
-    m_audio_processing_unit->updateRegister(
-        domain::Register::NR12, register_12);
-    m_audio_processing_unit->updateRegister(
-        domain::Register::NR14, register_14);
+    m_adsr_progression.state = AdsrProgression::State::Release;
 }
 
 void NotePlayer::stopChannel2()

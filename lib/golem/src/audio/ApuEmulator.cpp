@@ -32,20 +32,28 @@ void ApuEmulator::updateRegister(
 {
     m_audio_registers->setRegisterValue(reg, value, mask);
 
-    if (reg == domain::Register::NR14)
+    switch (reg)
     {
+    case domain::Register::NR14:
         if (value & mask & 0x80)
+        {
             m_channel_one_emulator.trigger();
-    }
-    else if (reg == domain::Register::NR24)
-    {
+        }
+        break;
+    case domain::Register::NR24:
         if (value & mask & 0x80)
+        {
             m_channel_two_emulator.trigger();
-    }
-    else if (reg == domain::Register::NR34)
-    {
+        }
+        break;
+    case domain::Register::NR34:
         if (value & mask & 0x80)
+        {
             m_channel_three_emulator.trigger();
+        }
+        break;
+    default:
+        break;
     }
 }
 
@@ -96,5 +104,4 @@ void ApuEmulator::getSamplesCallback(char* data, size_t length)
 
     tick();
 }
-
 }

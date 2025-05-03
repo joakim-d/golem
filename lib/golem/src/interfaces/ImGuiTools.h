@@ -10,6 +10,7 @@ class WindowDrawHelper
 public:
     WindowDrawHelper(ImVec2 offset = ImGui::GetWindowPos());
 
+    void drawRect(ImVec2 position, ImVec2 size, ImU32 color);
     void drawFilledRect(ImVec2 position, ImVec2 size, ImU32 color);
     void addText(ImVec2 position, ImU32 color, const char* text);
 

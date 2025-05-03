@@ -10,12 +10,12 @@ class IProjectRepository;
 namespace use_cases
 {
 
-class GetTicksPerNote
+class SetTicksPerNote
 {
 public:
-    GetTicksPerNote(domain::IProjectRepository& project_repository);
+    SetTicksPerNote(domain::IProjectRepository& project_repository);
 
-    unsigned int operator()(size_t song_index);
+    void operator()(size_t song_index, unsigned ticks_per_note);
 
 private:
     domain::IProjectRepository& m_project_repository;

@@ -1,6 +1,7 @@
 #include <golem/domain/instruments/Instrument.h>
 
-namespace domain {
+namespace domain
+{
 
 Instrument::Instrument()
 {
@@ -34,6 +35,16 @@ WaveInstrument& Instrument::wave()
 const WaveInstrument& Instrument::wave() const
 {
     return m_wave;
+}
+
+Adsr& Instrument::adsr()
+{
+    return m_adsr;
+}
+
+const Adsr& Instrument::adsr() const
+{
+    return m_adsr;
 }
 
 }

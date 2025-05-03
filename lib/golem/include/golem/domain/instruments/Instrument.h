@@ -1,13 +1,16 @@
 #pragma once
 
+#include <golem/domain/instruments/Adsr.h>
 #include <golem/domain/instruments/PulseInstrument.h>
 #include <golem/domain/instruments/WaveInstrument.h>
 
 #include <string>
 
-namespace domain {
+namespace domain
+{
 
-class Instrument {
+class Instrument
+{
 public:
     Instrument();
     virtual ~Instrument() = default;
@@ -21,10 +24,14 @@ public:
     WaveInstrument& wave();
     const WaveInstrument& wave() const;
 
+    Adsr& adsr();
+    const Adsr& adsr() const;
+
 private:
     std::string m_name;
     PulseInstrument m_pulse;
     WaveInstrument m_wave;
+    Adsr m_adsr;
 };
 
 }

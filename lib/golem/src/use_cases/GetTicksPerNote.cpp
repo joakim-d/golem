@@ -11,7 +11,7 @@ GetTicksPerNote::GetTicksPerNote(domain::IProjectRepository& project_repository)
 {
 }
 
-unsigned int GetTicksPerNote::execute(size_t song_index)
+unsigned int GetTicksPerNote::operator()(size_t song_index)
 {
     auto& project = m_project_repository.getProject();
 

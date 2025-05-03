@@ -16,6 +16,13 @@ void WindowDrawHelper::drawFilledRect(ImVec2 position, ImVec2 size, ImU32 color)
         color);
 }
 
+void WindowDrawHelper::drawRect(ImVec2 position, ImVec2 size, ImU32 color)
+{
+    m_draw_list->AddRect(
+        position + m_window_position, position + m_window_position + size,
+        color);
+}
+
 void WindowDrawHelper::addText(ImVec2 position, ImU32 color, const char* text)
 {
     m_draw_list->AddText(position + m_window_position, color, text);

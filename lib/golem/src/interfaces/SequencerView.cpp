@@ -39,7 +39,7 @@ void drawProgressionBar(
     const auto& playback_info = use_cases.get_playback_info.execute();
 
     const unsigned int ticks_per_note
-        = use_cases.get_ticks_per_note.execute(song_index);
+        = use_cases.get_ticks_per_note(song_index);
 
     if (ticks_per_note == 0)
     {

@@ -77,7 +77,7 @@ unsigned AudioRegisters::getChannel1EnvelopeSweepPace() const
 
 bool AudioRegisters::getChannel1LengthEnable() const
 {
-    const auto nr14 = m_register_values[NR12];
+    const auto nr14 = m_register_values[NR14];
     return (nr14 & 0x40);
 }
 
