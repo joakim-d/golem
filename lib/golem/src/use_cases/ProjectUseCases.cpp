@@ -25,6 +25,7 @@ ProjectUseCases::ProjectUseCases(
     , set_instrument_name(project_repository)
     , set_instrument_pulse(project_repository)
     , set_song_name(project_repository)
+    , set_ticks_per_note(project_repository)
     , stop_note(project_repository, note_player)
     , stop_song(song_player)
 {

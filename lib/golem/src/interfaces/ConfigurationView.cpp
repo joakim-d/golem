@@ -31,6 +31,8 @@ static void renderSongs(use_cases::ProjectUseCases& project_use_cases)
         char buffer[32];
         for (const auto& song : songs)
         {
+            ImGui::PushID(index);
+
             snprintf(buffer, sizeof(buffer), "Song %u", index + 1);
             ImGui::TreeNodeEx(
                 "Configuration##songs",
@@ -54,10 +56,19 @@ static void renderSongs(use_cases::ProjectUseCases& project_use_cases)
                     project_use_cases.set_song_name(index, buffer);
                 }
 
+                int ticks_per_note
+                    = project_use_cases.get_ticks_per_note(index);
+
+                if (ImGui::InputInt("Ticks per note", &ticks_per_note))
+                {
+                    project_use_cases.set_ticks_per_note(index, ticks_per_note);
+                }
+
                 ImGui::EndPopup();
             }
 
             ++index;
+            ImGui::PopID();
         }
     }
 }

@@ -47,6 +47,10 @@ unsigned int Song::notesPerPhrase() const
 
 void Song::setTicksPerNote(unsigned int ticks)
 {
+    if (ticks == 0)
+    {
+        return;
+    }
     m_ticks_per_note = ticks;
 }
 

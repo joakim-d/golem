@@ -44,7 +44,7 @@ GetMinMaxTrackFrequencies::operator()(size_t song_index, size_t track_index)
         {
             max_note = frequency;
         }
-        else if (frequency < min_note)
+        if (frequency < min_note)
         {
             min_note = frequency;
         }

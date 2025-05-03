@@ -17,6 +17,7 @@
 #include <golem/use_cases/SetInstrumentName.h>
 #include <golem/use_cases/SetInstrumentPulse.h>
 #include <golem/use_cases/SetSongName.h>
+#include <golem/use_cases/SetTicksPerNote.h>
 #include <golem/use_cases/StopNote.h>
 #include <golem/use_cases/StopSong.h>
 
@@ -54,6 +55,7 @@ public:
     SetInstrumentName set_instrument_name;
     SetInstrumentPulse set_instrument_pulse;
     SetSongName set_song_name;
+    SetTicksPerNote set_ticks_per_note;
     StopNote stop_note;
     StopSong stop_song;
 };
