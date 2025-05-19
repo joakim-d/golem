@@ -1,23 +1,22 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 
-namespace use_cases
-{
+namespace use_cases {
 
 class ProjectUseCases;
 
 }
 
-namespace gui
-{
+namespace gui {
 
-class PatternView
-{
+class PatternView {
 public:
     PatternView(
         use_cases::ProjectUseCases& project_use_cases,
-        size_t pattern_index);
+		std::optional<size_t> pattern_index,
+		const char* pattern_id);
 };
 
 }

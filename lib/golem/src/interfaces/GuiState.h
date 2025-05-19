@@ -3,14 +3,12 @@
 #include <cstddef>
 #include <imgui.h>
 
-namespace gui
-{
+namespace gui {
 
-class GuiState
-{
+class GuiState {
 public:
-    static ImColor selectedColor();
-    static ImColor idleColor();
+	static ImColor selectedColor();
+	static ImColor idleColor();
     static ImColor hoveredColor();
 
     static size_t songIndex();
@@ -23,7 +21,7 @@ public:
     static void setInstrumentIndex(size_t instrument_index);
 
     static size_t patternIndex();
-    static void setPatternIndex(size_t pattern_index);
+	static void setPatternIndex(size_t pattern_index);
 };
 
 }

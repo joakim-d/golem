@@ -1,7 +1,6 @@
 #include <golem/domain/Song.h>
 
-namespace domain
-{
+namespace domain {
 
 Song::Song()
     : m_ticks_per_note(12)
@@ -12,16 +11,14 @@ Song::Song()
 
 void Song::visitTracks(const std::function<void(Track&)>& callback)
 {
-    for (auto& track : m_tracks)
-    {
+	for (auto& track : m_tracks) {
         callback(track);
     }
 }
 
 void Song::visitTracks(const std::function<void(const Track&)>& callback) const
 {
-    for (const auto& track : m_tracks)
-    {
+	for (const auto& track : m_tracks) {
         callback(track);
     }
 }
@@ -48,8 +45,7 @@ unsigned int Song::notesPerPattern() const
 
 void Song::setTicksPerNote(unsigned int ticks)
 {
-    if (ticks == 0)
-    {
+	if (ticks == 0) {
         return;
     }
     m_ticks_per_note = ticks;
