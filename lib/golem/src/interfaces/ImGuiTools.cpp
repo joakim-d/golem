@@ -1,5 +1,7 @@
 #include <interfaces/ImGuiTools.h>
 
+#include <interfaces/GuiState.h>
+
 namespace gui
 {
 
@@ -57,6 +59,19 @@ bool IsMouseChildDown(ImGuiMouseButton button)
 ImVec2 GetMouseToWindowPosition()
 {
     return ImGui::GetMousePos() - ImGui::GetWindowPos();
+}
+
+ImColor getClickableItemColor(bool is_already_selected)
+{
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        return GuiState::hoveredColor();
+    }
+    if (is_already_selected)
+        return GuiState::selectedColor();
+
+    return GuiState::idleColor();
 }
 
 }

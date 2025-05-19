@@ -22,8 +22,11 @@ public:
 
     size_t notesCount() const;
 
-    unsigned int notesPerPhrase() const;
-    void setNotesPerPhrase(unsigned int notes_per_phrase);
+    unsigned int notesPerPattern() const;
+    void setNotesPerPattern(unsigned int notes_per_pattern);
+
+    unsigned int patternsPerTrack() const;
+    void setPatternsPerTrack(unsigned int patterns_per_track);
 
     unsigned int ticksPerNote() const;
     void setTicksPerNote(unsigned int ticks);
@@ -37,8 +40,9 @@ private:
     std::string m_name;
     size_t m_notes_count;
     unsigned int m_ticks_per_note;
-    unsigned int m_notes_per_phrase;
+    unsigned int m_notes_per_pattern;
     std::array<Track, TRACK_COUNT> m_tracks;
+    unsigned int m_patterns_per_track;
 };
 
 }

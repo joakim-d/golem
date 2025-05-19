@@ -52,55 +52,55 @@ TrackView::TrackView(
         return;
     }
 
-    const auto min_max
-        = use_cases.get_min_max_track_frequencies(song_index, track_index);
+    // const auto min_max
+    //     = use_cases.get_min_max_track_frequencies(song_index, track_index);
 
-    if (!min_max)
-    {
-        return;
-    }
+    // if (!min_max)
+    // {
+    //     return;
+    // }
 
-    auto delta = static_cast<unsigned>(min_max->second)
-        - static_cast<unsigned>(min_max->first) + 1;
+    // auto delta = static_cast<unsigned>(min_max->second)
+    //     - static_cast<unsigned>(min_max->first) + 1;
 
-    const auto note_height = VIEW_HEIGHT / delta > 0 ? VIEW_HEIGHT / delta : 1;
-    const auto note_width = PHRASE_WIDTH / notes_per_phrase;
+    // const auto note_height = VIEW_HEIGHT / delta > 0 ? VIEW_HEIGHT / delta :
+    // 1; const auto note_width = PHRASE_WIDTH / notes_per_phrase;
 
-    const auto note_count = track->noteCount();
-    const auto phrases = note_count / notes_per_phrase;
+    // const auto note_count = track->noteCount();
+    // const auto phrases = note_count / notes_per_phrase;
 
-    size_t note_index = 0;
-    WindowDrawHelper draw_helper;
-    for (size_t phrase_index = 0; phrase_index < phrases; ++phrase_index)
-    {
-        draw_helper.drawRect(
-            { static_cast<float>(phrase_index * (PHRASE_WIDTH + SPACING)),
-              0.f },
-            { PHRASE_WIDTH, VIEW_HEIGHT }, ImColor { 255, 0, 0 });
+    // size_t note_index = 0;
+    // WindowDrawHelper draw_helper;
+    // for (size_t phrase_index = 0; phrase_index < phrases; ++phrase_index)
+    // {
+    //     draw_helper.drawRect(
+    //         { static_cast<float>(phrase_index * (PHRASE_WIDTH + SPACING)),
+    //           0.f },
+    //         { PHRASE_WIDTH, VIEW_HEIGHT }, ImColor { 255, 0, 0 });
 
-        for (size_t current_note = phrase_index * notes_per_phrase,
-                    end_note = current_note + notes_per_phrase;
-             current_note != end_note; current_note++)
-        {
-            auto note = track->note(current_note);
-            if (!note.has_value())
-            {
-                continue;
-            }
+    //     for (size_t current_note = phrase_index * notes_per_phrase,
+    //                 end_note = current_note + notes_per_phrase;
+    //          current_note != end_note; current_note++)
+    //     {
+    //         auto note = track->note(current_note);
+    //         if (!note.has_value())
+    //         {
+    //             continue;
+    //         }
 
-            const auto position = static_cast<unsigned>(note->frequency())
-                - static_cast<unsigned>(min_max->first);
+    //         const auto position = static_cast<unsigned>(note->frequency())
+    //             - static_cast<unsigned>(min_max->first);
 
-            draw_helper.drawFilledRect(
-                { float(
-                      (current_note - (phrase_index * notes_per_phrase))
-                          * note_width
-                      + (phrase_index * (PHRASE_WIDTH + SPACING))),
-                  VIEW_HEIGHT - ((position + 1) * note_height) },
-                { float(note_width), float(note_height) },
-                ImColor { 255, 0, 0 });
-        }
-    }
+    //         draw_helper.drawFilledRect(
+    //             { float(
+    //                   (current_note - (phrase_index * notes_per_phrase))
+    //                       * note_width
+    //                   + (phrase_index * (PHRASE_WIDTH + SPACING))),
+    //               VIEW_HEIGHT - ((position + 1) * note_height) },
+    //             { float(note_width), float(note_height) },
+    //             ImColor { 255, 0, 0 });
+    //     }
+    // }
 
     ImGui::Dummy({ -1, VIEW_HEIGHT });
 }

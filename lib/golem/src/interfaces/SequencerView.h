@@ -15,7 +15,7 @@ class SequencerView
 public:
     SequencerView(use_cases::ProjectUseCases& use_cases, ImVec2 offset);
 
-    static float viewWidth();
+    static float viewWidth(use_cases::ProjectUseCases& use_cases);
 };
 
 }

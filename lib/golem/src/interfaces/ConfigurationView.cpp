@@ -56,12 +56,19 @@ static void renderSongs(use_cases::ProjectUseCases& project_use_cases)
                     project_use_cases.set_song_name(index, buffer);
                 }
 
-                int ticks_per_note
-                    = project_use_cases.get_ticks_per_note(index);
+                int ticks_per_note = song.ticksPerNote();
 
                 if (ImGui::InputInt("Ticks per note", &ticks_per_note))
                 {
                     project_use_cases.set_ticks_per_note(index, ticks_per_note);
+                }
+
+                int patterns_per_track = song.patternsPerTrack();
+
+                if (ImGui::InputInt("Patterns per track", &patterns_per_track))
+                {
+                    // project_use_cases.set_patterns_per_track(index,
+                    // patterns_per_track);
                 }
 
                 ImGui::EndPopup();

@@ -19,7 +19,7 @@ static ImColor COLORS[12] {
     ImColor { 0x11, 0x11, 0x11 }, ImColor { 0x22, 0x22, 0x22 },
 };
 
-constexpr int CELL_WIDTH = 15;
+constexpr int CELL_WIDTH = 31;
 constexpr int CELL_HEIGHT = 13;
 constexpr int CELL_SPACING = 1;
 constexpr int NOTES_BY_PHRASE = 16;
@@ -80,36 +80,40 @@ SequencerView::SequencerView(
     static int note_moving_index;
     static domain::NoteFrequency note_pressed_frequency;
 
-    const int cell_by_row = (window_size.x / (CELL_WIDTH + CELL_SPACING)) + 1;
+    const auto pattern_index = GuiState::patternIndex();
+
+    auto pattern = use_cases.get_pattern(pattern_index);
+
+    const float cell_width
+        = (window_size.x / static_cast<float>(pattern->noteCount()))
+        - CELL_SPACING;
+    const int cell_by_row = pattern->noteCount();
     const int cell_by_column
         = (window_size.y / (CELL_HEIGHT + CELL_SPACING)) + 1;
+    const int start_i = 0;
     const int start_j = offset.y / (CELL_HEIGHT + CELL_SPACING);
-    const int start_i = offset.x / (CELL_WIDTH + CELL_SPACING);
 
-    const int draw_cells_on_row
-        = start_i + cell_by_row > NOTES_BY_PHRASE * PHRASE_COUNT
-        ? (16 * 16) - start_i
-        : cell_by_row;
+    const int draw_cells_on_row = pattern->noteCount();
 
     const int draw_cells_on_column
         = start_j + cell_by_column > 12 * 6 // 12 notes * 6 octaves
         ? (12 * 6) - start_j
         : cell_by_column;
 
-    const int start_x_offset = (static_cast<int>(offset.x) % (CELL_WIDTH + 1));
+    const int start_x_offset = 0;
     const int start_y_offset = (static_cast<int>(offset.y) % (CELL_HEIGHT + 1));
 
     auto song_index = GuiState::songIndex();
     auto track_index = GuiState::trackIndex();
 
-    ImVec2 size = ImVec2 { CELL_WIDTH, CELL_HEIGHT };
+    ImVec2 size = ImVec2 { cell_width, CELL_HEIGHT };
     ImVec2 position;
     int rect_index = 0;
     for (int j = -1; j <= draw_cells_on_column; j++)
     {
-        for (int i = -1; i <= draw_cells_on_row; i++)
+        for (int i = 0; i < draw_cells_on_row; i++)
         {
-            position.x = i * (CELL_WIDTH + CELL_SPACING) - start_x_offset;
+            position.x = i * (cell_width + CELL_SPACING);
             position.y = j * (CELL_HEIGHT + CELL_SPACING) - start_y_offset;
 
             window_draw_helper.drawFilledRect(
@@ -125,7 +129,7 @@ SequencerView::SequencerView(
         const auto position = GetMouseToWindowPosition();
 
         note_pressed_index
-            = (position.x + offset.x) / (CELL_WIDTH + CELL_SPACING);
+            = (position.x + offset.x) / (cell_width + CELL_SPACING);
 
         note_moving_index = note_pressed_index;
 
@@ -142,7 +146,7 @@ SequencerView::SequencerView(
     {
         const auto position = GetMouseToWindowPosition();
         note_moving_index
-            = (position.x + offset.x) / (CELL_WIDTH + CELL_SPACING);
+            = (position.x + offset.x) / (cell_width + CELL_SPACING);
     }
 
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && note_edition)
@@ -150,7 +154,7 @@ SequencerView::SequencerView(
         const auto position = GetMouseToWindowPosition();
         note_edition = false;
         const int note_released_index
-            = (position.x + offset.x) / (CELL_WIDTH + CELL_SPACING);
+            = (position.x + offset.x) / (cell_width + CELL_SPACING);
 
         const unsigned note_duration
             = std::abs(note_pressed_index - note_released_index) + 1;
@@ -161,7 +165,7 @@ SequencerView::SequencerView(
         use_cases.stop_note.execute(static_cast<domain::Channel>(track_index));
 
         use_cases.add_note.execute(
-            song_index, track_index, absolute_note_index,
+            pattern_index, absolute_note_index,
             domain::Note { note_pressed_frequency, note_duration,
                            GuiState::instrumentIndex() });
     }
@@ -180,16 +184,16 @@ SequencerView::SequencerView(
 
     for (int i = 0; i < draw_cells_on_row; i++)
     {
-        const auto note = track->note(i + start_i);
+        const auto note = pattern->note(i + start_i);
 
         if (!note.has_value())
             continue;
 
-        position.x = i * (CELL_WIDTH + CELL_SPACING) - start_x_offset + 1;
+        position.x = i * (cell_width + CELL_SPACING) - start_x_offset + 1;
         position.y = ((6 * 12 - int(note->frequency())) - 1)
                 * (CELL_HEIGHT + CELL_SPACING)
             - offset.y + 1;
-        size.x = (CELL_WIDTH + CELL_SPACING) * note->duration() - 2;
+        size.x = (cell_width + CELL_SPACING) * note->duration() - 2;
         window_draw_helper.drawFilledRect(position, size, note_color);
     }
 
@@ -203,22 +207,23 @@ SequencerView::SequencerView(
         = std::min(note_pressed_index, note_moving_index);
 
     position.x
-        = absolute_note_index * (CELL_WIDTH + CELL_SPACING) - offset.x + 1;
+        = absolute_note_index * (cell_width + CELL_SPACING) - offset.x + 1;
 
     position.y = ((6 * 12 - int(note_pressed_frequency)) - 1)
             * (CELL_HEIGHT + CELL_SPACING)
         - offset.y + 1;
 
-    size.x = (CELL_WIDTH + CELL_SPACING)
+    size.x = (cell_width + CELL_SPACING)
             * (std::abs(note_moving_index - note_pressed_index) + 1)
         - 2;
 
     window_draw_helper.drawFilledRect(position, size, ImColor { 0xFF, 0, 0 });
 }
 
-float SequencerView::viewWidth()
+float SequencerView::viewWidth(use_cases::ProjectUseCases& use_cases)
 {
-    return (CELL_WIDTH + CELL_SPACING) * NOTES_BY_PHRASE * PHRASE_COUNT;
+    return (CELL_WIDTH + CELL_SPACING)
+        * use_cases.get_pattern(GuiState::patternIndex())->noteCount();
 }
 
 }

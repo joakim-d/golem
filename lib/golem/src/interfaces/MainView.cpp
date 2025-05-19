@@ -35,7 +35,7 @@ MainView::MainView(
     if (IsMouseChildDown(ImGuiMouseButton_Middle))
     {
         auto current_mouse_pos = ImGui::GetMousePos();
-        offset.x += previous_mouse_pos.x - current_mouse_pos.x;
+        // offset.x += previous_mouse_pos.x - current_mouse_pos.x;
         offset.y += previous_mouse_pos.y - current_mouse_pos.y;
 
         const auto window_size = ImGui::GetWindowSize();
@@ -44,22 +44,13 @@ MainView::MainView(
             + SequencerHeaderView::viewHeight()
             + 10; // I don't know why we need to add 10 pixels here...
 
-        const float max_x_offset = SequencerView::viewWidth();
+        const float max_x_offset = SequencerView::viewWidth(use_cases);
 
         if (offset.y > max_y_offset)
         {
             offset.y = max_y_offset;
         }
 
-        if (offset.x > max_x_offset)
-        {
-            offset.x = max_x_offset;
-        }
-
-        if (offset.x < 0.f)
-        {
-            offset.x = 0.f;
-        }
         if (offset.y < 0.f)
         {
             offset.y = 0.f;

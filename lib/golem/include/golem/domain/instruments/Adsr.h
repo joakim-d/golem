@@ -6,6 +6,8 @@ namespace domain
 class Adsr
 {
 public:
+    Adsr();
+
     void setAttackVolume(unsigned attackVolume);
     void setAttackLength(unsigned attackLength);
     void setDelayVolume(unsigned delayVolume);
@@ -29,7 +31,7 @@ private:
     unsigned m_delay_length { 4 };
     unsigned m_substain_volume { 5 };
     unsigned m_release_volume { 3 };
-    unsigned m_release_length { 3 };
+    unsigned m_release_length { 7 };
 };
 
 }

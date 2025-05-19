@@ -3,6 +3,17 @@
 namespace domain
 {
 
+Adsr::Adsr()
+    : m_attack_volume(1)
+    , m_attack_length(7)
+    , m_delay_volume(10)
+    , m_delay_length(2)
+    , m_substain_volume(7)
+    , m_release_length(7)
+    , m_release_volume(3)
+{
+}
+
 void Adsr::setAttackLength(unsigned attackLength)
 {
     m_attack_length = attackLength;

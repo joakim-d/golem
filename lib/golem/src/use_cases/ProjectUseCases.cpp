@@ -7,16 +7,19 @@ ProjectUseCases::ProjectUseCases(
     domain::IProjectRepository& project_repository,
     domain::events::ProjectDomainEventProcessor& event_processor,
     core::NotePlayer& note_player,
-    core::SongPlayer& song_player)
+    core::SongPlayer& song_player,
+    std::map<domain::ExportFormat, domain::IExportService*> export_services)
     : add_instrument(project_repository, event_processor)
     , add_note(project_repository)
     , add_song(project_repository)
     , create_new_project(project_repository)
+    , export_project(project_repository, std::move(export_services))
     , get_instruments(project_repository)
-    , get_phrase_view(project_repository)
     , get_playback_info(song_player)
     , get_min_max_track_frequencies(project_repository)
     , get_notes_per_phrase(project_repository)
+    , get_pattern(project_repository)
+    , get_song(project_repository)
     , get_songs(project_repository)
     , get_ticks_per_note(project_repository)
     , get_track(project_repository)

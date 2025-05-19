@@ -4,11 +4,13 @@
 #include <golem/use_cases/AddNote.h>
 #include <golem/use_cases/AddSong.h>
 #include <golem/use_cases/CreateNewProject.h>
+#include <golem/use_cases/ExportProject.h>
 #include <golem/use_cases/GetInstruments.h>
 #include <golem/use_cases/GetMinMaxTrackFrequencies.h>
 #include <golem/use_cases/GetNotesPerPhrase.h>
-#include <golem/use_cases/GetPhraseView.h>
+#include <golem/use_cases/GetPattern.h>
 #include <golem/use_cases/GetPlaybackInfo.h>
+#include <golem/use_cases/GetSong.h>
 #include <golem/use_cases/GetSongs.h>
 #include <golem/use_cases/GetTicksPerNote.h>
 #include <golem/use_cases/GetTrack.h>
@@ -36,17 +38,21 @@ public:
         domain::IProjectRepository& project_repository,
         domain::events::ProjectDomainEventProcessor& events_processor,
         core::NotePlayer& note_player,
-        core::SongPlayer& song_player);
+        core::SongPlayer& song_player,
+        std::map<domain::ExportFormat, domain::IExportService*>
+            export_services);
 
     AddInstrument add_instrument;
     AddNote add_note;
     AddSong add_song;
     CreateNewProject create_new_project;
+    ExportProject export_project;
     GetInstruments get_instruments;
-    GetPhraseView get_phrase_view;
     GetPlaybackInfo get_playback_info;
     GetMinMaxTrackFrequencies get_min_max_track_frequencies;
     GetNotesPerPhrase get_notes_per_phrase;
+    GetPattern get_pattern;
+    GetSong get_song;
     GetSongs get_songs;
     GetTicksPerNote get_ticks_per_note;
     GetTrack get_track;

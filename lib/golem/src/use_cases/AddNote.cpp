@@ -14,46 +14,38 @@ AddNote::AddNote(domain::IProjectRepository& project_repository)
 }
 
 void AddNote::execute(
-    size_t song_index,
-    size_t track_index,
+    size_t pattern_index,
     size_t note_index,
     domain::Note note)
 {
     auto& project = m_project_repository.getProject();
 
-    auto song = project.song(song_index);
-    if (song == nullptr)
+    auto pattern = project.pattern(pattern_index);
+    if (pattern == nullptr)
     {
         return;
     }
-
-    if (track_index >= domain::Song::TRACK_COUNT)
-    {
-        return;
-    }
-
-    auto& track = song->getTrack(track_index);
 
     // Cleaning any notes that are overlapping with the new
     // one
     const auto duration = note.duration();
     for (auto i = note_index + 1; i < note_index + duration; ++i)
     {
-        track.clearNote(i);
+        pattern->clearNote(i);
     }
 
     // Reduce the duration of the note before the inserted one
     for (int i = int(note_index) - 1; i >= 0; --i)
     {
-        auto note = track.note(i);
+        auto note = pattern->note(i);
         if (note.has_value() && note->duration() + i > note_index)
         {
             note->setDuration(note_index - i);
-            track.setNote(i, *note);
+            pattern->setNote(i, *note);
         }
     }
 
-    track.setNote(note_index, note);
+    pattern->setNote(note_index, note);
 }
 
 }

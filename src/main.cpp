@@ -1,5 +1,6 @@
 #include <golem/domain/events/ProjectDomainEventProcessor.h>
 #include <golem/infrastructure/InMemoryProjectRepository.h>
+#include <golem/infrastructure/exporter/CProjectExporter.h>
 #include <golem/interfaces/gui/MainWindow.h>
 #include <golem/use_cases/ProjectUseCases.h>
 
@@ -30,9 +31,15 @@ int main(int argc, char* argv[])
     core::SongPlayer song_player { project_repository, events_processor,
                                    apu_emulator, note_player };
 
+    std::map<domain::ExportFormat, domain::IExportService*> export_services;
+
+    infrastructure::CProjectExporter cproject_exporter;
+    export_services[domain::ExportFormat::CProject] = &cproject_exporter;
+
     use_cases::ProjectUseCases project_use_cases { project_repository,
                                                    events_processor,
-                                                   note_player, song_player };
+                                                   note_player, song_player,
+                                                   std::move(export_services) };
 
     audio_output->play();
 

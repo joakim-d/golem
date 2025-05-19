@@ -5,7 +5,8 @@ namespace domain
 
 Song::Song()
     : m_ticks_per_note(12)
-    , m_notes_per_phrase(16)
+    , m_notes_per_pattern(16)
+    , m_patterns_per_track(8)
 {
 }
 
@@ -35,14 +36,14 @@ const Track& Song::getTrack(size_t index) const
     return m_tracks[index];
 }
 
-void Song::setNotesPerPhrase(unsigned int notes_per_phrase)
+void Song::setNotesPerPattern(unsigned int notes_per_phrase)
 {
-    m_notes_per_phrase = notes_per_phrase;
+    m_notes_per_pattern = notes_per_phrase;
 }
 
-unsigned int Song::notesPerPhrase() const
+unsigned int Song::notesPerPattern() const
 {
-    return m_notes_per_phrase;
+    return m_notes_per_pattern;
 }
 
 void Song::setTicksPerNote(unsigned int ticks)
@@ -72,6 +73,11 @@ void Song::setName(std::string name)
 size_t Song::notesCount() const
 {
     return 256;
+}
+
+unsigned int Song::patternsPerTrack() const
+{
+    return m_patterns_per_track;
 }
 
 }

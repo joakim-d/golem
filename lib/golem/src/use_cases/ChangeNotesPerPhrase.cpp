@@ -17,7 +17,7 @@ void ChangeNotesPerPhrase::execute(size_t song_index, unsigned int notes_per_phr
     if (song == nullptr) {
         return;
     }
-    song->setNotesPerPhrase(notes_per_phrase);
+    song->setNotesPerPattern(notes_per_phrase);
 }
 
 }

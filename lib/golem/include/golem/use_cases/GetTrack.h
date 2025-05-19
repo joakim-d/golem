@@ -1,6 +1,6 @@
 #pragma once
 
-#include <golem/domain/PhraseView.h>
+#include <cstddef>
 
 namespace domain
 {

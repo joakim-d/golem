@@ -69,7 +69,8 @@ void SongPlayer::tick()
         {
             const auto& track = song->getTrack(track_index);
 
-            const auto& note = track.note(m_global_status.current_note);
+            const auto& note = std::optional<domain::Note> {};
+            // track.note(m_global_status..current_note);
 
             if (note.has_value())
             {
