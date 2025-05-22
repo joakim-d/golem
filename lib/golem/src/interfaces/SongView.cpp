@@ -24,10 +24,12 @@ SongView::SongView(
 
 	const ImVec2 cursor_screen_pos = {0, 0};
 
-    const auto track_index = GuiState::trackIndex();
+	auto& gui_state = GuiState::instance();
 
-    const auto selected_color = GuiState::selectedColor();
-    const auto idle_color = GuiState::idleColor();
+	const auto track_index = gui_state.track_index;
+
+	const auto selected_color = gui_state.selected_color;
+	const auto idle_color = gui_state.idle_color;
 
     ImGui::BeginChild(
 		"Pulse 1 Label",
@@ -38,11 +40,11 @@ SongView::SongView(
 		ImGui::Dummy({64, cellHeight});
         WindowDrawHelper draw_helper;
         draw_helper.drawFilledRect(
-			{0, 0}, {64, cellHeight}, getClickableItemColor(GuiState::trackIndex() == 0));
+			{0, 0}, {64, cellHeight}, getClickableItemColor(gui_state.track_index == 0));
 		draw_helper.addText({1, 0}, 0xFFFFFFFF, "Pulse 1");
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-            GuiState::setTrackIndex(0);
+			gui_state.track_index = 0;
         }
     }
     ImGui::EndChild();
@@ -61,11 +63,11 @@ SongView::SongView(
         WindowDrawHelper draw_helper;
 		ImGui::Dummy({64, cellHeight});
         draw_helper.drawFilledRect(
-			{0, 0}, {64, cellHeight}, getClickableItemColor(GuiState::trackIndex() == 1));
+			{0, 0}, {64, cellHeight}, getClickableItemColor(gui_state.track_index == 1));
 		draw_helper.addText({1, 0}, 0xFFFFFFFF, "Pulse 2");
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-            GuiState::setTrackIndex(1);
+			gui_state.track_index = 1;
         }
     }
     ImGui::EndChild();
@@ -83,11 +85,11 @@ SongView::SongView(
         WindowDrawHelper draw_helper;
 		ImGui::Dummy({64, cellHeight});
         draw_helper.drawFilledRect(
-			{0, 0}, {64, cellHeight}, getClickableItemColor(GuiState::trackIndex() == 2));
+			{0, 0}, {64, cellHeight}, getClickableItemColor(gui_state.track_index == 2));
 		draw_helper.addText({1, 0}, 0xFFFFFFFF, "Wave");
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-            GuiState::setTrackIndex(2);
+			gui_state.track_index = 2;
         }
     }
     ImGui::EndChild();
@@ -105,11 +107,11 @@ SongView::SongView(
         WindowDrawHelper draw_helper;
 		ImGui::Dummy({64, cellHeight});
         draw_helper.drawFilledRect(
-			{0, 0}, {64, cellHeight}, getClickableItemColor(GuiState::trackIndex() == 3));
+			{0, 0}, {64, cellHeight}, getClickableItemColor(gui_state.track_index == 3));
 		draw_helper.addText({1, 0}, 0xFFFFFFFF, "Noise");
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-            GuiState::setTrackIndex(3);
+			gui_state.track_index = 3;
         }
     }
     ImGui::EndChild();

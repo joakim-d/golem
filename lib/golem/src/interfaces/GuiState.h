@@ -3,25 +3,37 @@
 #include <cstddef>
 #include <imgui.h>
 
+#include <optional>
+
 namespace gui {
 
 class GuiState {
 public:
-	static ImColor selectedColor();
-	static ImColor idleColor();
-    static ImColor hoveredColor();
+	static GuiState& instance();
 
-    static size_t songIndex();
-    static void setSongIndex(size_t song_index);
+	GuiState(const GuiState&) = delete;
+	GuiState& operator=(const GuiState&) = delete;
+	GuiState(GuiState&&) = delete;
+	GuiState& operator=(GuiState&&) = delete;
 
-    static size_t trackIndex();
-    static void setTrackIndex(size_t track_index);
+	ImColor selected_color;
+	ImColor idle_color;
+	ImColor hovered_color;
 
-    static size_t instrumentIndex();
-    static void setInstrumentIndex(size_t instrument_index);
+	size_t song_index;
+	size_t track_index;
+	size_t instrument_index;
+	size_t pattern_index;
 
-    static size_t patternIndex();
-	static void setPatternIndex(size_t pattern_index);
+	struct DraggedPattern {
+		ImVec2 offset_position; // Relative to the mouse position
+		size_t pattern_index;
+	};
+
+	std::optional<DraggedPattern> dragged_pattern;
+
+private:
+	GuiState();
 };
 
 }

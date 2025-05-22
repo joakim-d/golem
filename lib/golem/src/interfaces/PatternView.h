@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 
 namespace use_cases {
@@ -16,7 +17,9 @@ public:
     PatternView(
         use_cases::ProjectUseCases& project_use_cases,
 		std::optional<size_t> pattern_index,
-		const char* pattern_id);
+		const char* pattern_id,
+		bool track_pattern = false,
+		std::function<void()> on_drag = {});
 };
 
 }

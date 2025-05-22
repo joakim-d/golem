@@ -20,27 +20,26 @@
 #include <golem/use_cases/SetInstrumentPulse.h>
 #include <golem/use_cases/SetSongName.h>
 #include <golem/use_cases/SetTicksPerNote.h>
+#include <golem/use_cases/SetTrackPattern.h>
 #include <golem/use_cases/StopNote.h>
 #include <golem/use_cases/StopSong.h>
 
-namespace core
-{
+namespace core {
 class NotePlayer;
 }
 
-namespace use_cases
-{
+namespace use_cases {
 
-class ProjectUseCases
-{
+class ProjectUseCases {
 public:
     ProjectUseCases(
         domain::IProjectRepository& project_repository,
         domain::events::ProjectDomainEventProcessor& events_processor,
         core::NotePlayer& note_player,
         core::SongPlayer& song_player,
-        std::map<domain::ExportFormat, domain::IExportService*>
-            export_services);
+		std::map<
+			domain::ExportFormat,
+			domain::IExportService*> export_services);
 
     AddInstrument add_instrument;
     AddNote add_note;
@@ -62,6 +61,7 @@ public:
     SetInstrumentPulse set_instrument_pulse;
     SetSongName set_song_name;
     SetTicksPerNote set_ticks_per_note;
+	SetTrackPattern set_track_pattern;
     StopNote stop_note;
     StopSong stop_song;
 };

@@ -36,7 +36,7 @@ TrackView::TrackView(
     auto track = use_cases.get_track(song_index, track_index);
 
 	if (IsMouseChildClicked(ImGuiMouseButton_Left)) {
-        GuiState::setTrackIndex(track_index);
+		GuiState::instance().track_index = track_index;
     }
 	char pattern_id[32];
 
@@ -47,10 +47,18 @@ TrackView::TrackView(
 			sizeof(pattern_id),
 			"%u_%u",
 			static_cast<unsigned>(track_index),
-			static_cast<unsigned>(pattern_position++));
+			static_cast<unsigned>(pattern_position));
 
-		PatternView pattern_view {use_cases, pattern_index, pattern_id};
+		PatternView pattern_view {use_cases, pattern_index, pattern_id, true, [&]() {
+									  auto& gui_state = GuiState::instance();
+									  use_cases.set_track_pattern(
+										  song_index,
+										  track_index,
+										  pattern_position,
+										  gui_state.dragged_pattern->pattern_index);
+								  }};
 		ImGui::SameLine();
+		pattern_position++;
 	}
 
 	ImGui::Dummy({-1, VIEW_HEIGHT});

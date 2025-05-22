@@ -12,8 +12,11 @@
 #include <imgui.h>
 
 #include <interfaces/ConfigurationView.h>
+#include <interfaces/GuiState.h>
+#include <interfaces/ImGuiTools.h>
 #include <interfaces/MainView.h>
 #include <interfaces/MenuBar.h>
+#include <interfaces/PatternView.h>
 #include <interfaces/SongView.h>
 
 namespace gui {
@@ -128,7 +131,19 @@ int MainWindow::execute(
         ImGui::SameLine();
 		ConfigurationView configuration_view {use_cases};
 
-        ImGui::End();
+		auto& gui_state = GuiState::instance();
+		if (gui_state.dragged_pattern.has_value()) {
+			auto position = ImGui::GetMousePos() + gui_state.dragged_pattern->offset_position;
+			ImGui::SetCursorScreenPos(position); // Set absolute screen position
+			PatternView pattern_view {
+				use_cases, gui_state.dragged_pattern->pattern_index, "dragged_pattern", false};
+
+			if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+				gui_state.dragged_pattern.reset();
+			}
+		}
+
+		ImGui::End();
         ImGui::PopStyleColor();
 
         // Render ImGui
