@@ -16,23 +16,21 @@ GetMinMaxTrackFrequencies::GetMinMaxTrackFrequencies(
 }
 
 std::optional<std::pair<domain::NoteFrequency, domain::NoteFrequency>>
-GetMinMaxTrackFrequencies::operator()(size_t song_index, size_t track_index)
+GetMinMaxTrackFrequencies::operator()(size_t pattern_index)
 {
-    auto song = m_project_repository.getProject().song(song_index);
+    auto pattern = m_project_repository.getProject().pattern(pattern_index);
 
-    if (song == nullptr || track_index >= domain::Song::TRACK_COUNT)
+    if (pattern == nullptr)
     {
         return {};
     }
 
-    auto& track = song->getTrack(track_index);
-
     unsigned min_note = std::numeric_limits<unsigned>::max();
     unsigned max_note = std::numeric_limits<unsigned>::min();
 
-    for (size_t i = 0; i < track.noteCount(); ++i)
+    for (size_t i = 0; i < pattern->noteCount(); ++i)
     {
-        const auto& note = track.note(i);
+        const auto& note = pattern->note(i);
         if (!note.has_value())
         {
             continue;

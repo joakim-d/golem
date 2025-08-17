@@ -34,22 +34,22 @@ SongPlayer::~SongPlayer()
 
 void SongPlayer::playSong(size_t index)
 {
-    m_global_status.paused = false;
+    for (size_t i = 0; i < 4; ++i)
+    {
+        m_global_status.paused[i] = false;
+    }
     m_song_index = index;
     if (m_global_status.stopped)
     {
         m_global_status.stopped = false;
         m_global_status = domain::PlaybackInfo {};
-
-        for (size_t i = 0; i < 4; i++)
-        {
-            m_channel_statuses[i] = ChannelPlayStatus {};
-        }
     }
 }
 
 void SongPlayer::tick()
 {
+    return;
+    /*
     if (m_global_status.paused || m_global_status.stopped)
     {
         return;
@@ -69,9 +69,15 @@ void SongPlayer::tick()
         {
             const auto& track = song->getTrack(track_index);
 
-            const auto& note = track.note(m_global_status.current_note);
+            m_global_status.current_pattern[track_index]
 
-            if (note.has_value())
+                const auto& note
+                = std::optional<domain::Note> {};
+
+            m_global_status.
+                // track.note(m_global_status..current_note);
+
+                if (note.has_value())
             {
                 m_note_player.play(
                     note->instrumentIndex(),
@@ -118,11 +124,12 @@ void SongPlayer::tick()
 
     m_global_status.stopped = true;
     m_event_processor.publishEvent(m_global_status);
+*/
 }
 
 void SongPlayer::pause()
 {
-    m_global_status.paused = true;
+    // m_global_status.paused = true;
     m_note_player.stop(domain::Channel::Channel1);
     m_note_player.stop(domain::Channel::Channel2);
     m_note_player.stop(domain::Channel::Channel3);

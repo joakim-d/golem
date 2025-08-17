@@ -1,26 +1,24 @@
 #include <golem/domain/Song.h>
 
-namespace domain
-{
+namespace domain {
 
 Song::Song()
     : m_ticks_per_note(12)
-    , m_notes_per_phrase(16)
+    , m_notes_per_pattern(16)
+    , m_patterns_per_track(8)
 {
 }
 
 void Song::visitTracks(const std::function<void(Track&)>& callback)
 {
-    for (auto& track : m_tracks)
-    {
+	for (auto& track : m_tracks) {
         callback(track);
     }
 }
 
 void Song::visitTracks(const std::function<void(const Track&)>& callback) const
 {
-    for (const auto& track : m_tracks)
-    {
+	for (const auto& track : m_tracks) {
         callback(track);
     }
 }
@@ -35,20 +33,19 @@ const Track& Song::getTrack(size_t index) const
     return m_tracks[index];
 }
 
-void Song::setNotesPerPhrase(unsigned int notes_per_phrase)
+void Song::setNotesPerPattern(unsigned int notes_per_phrase)
 {
-    m_notes_per_phrase = notes_per_phrase;
+    m_notes_per_pattern = notes_per_phrase;
 }
 
-unsigned int Song::notesPerPhrase() const
+unsigned int Song::notesPerPattern() const
 {
-    return m_notes_per_phrase;
+    return m_notes_per_pattern;
 }
 
 void Song::setTicksPerNote(unsigned int ticks)
 {
-    if (ticks == 0)
-    {
+	if (ticks == 0) {
         return;
     }
     m_ticks_per_note = ticks;
@@ -72,6 +69,11 @@ void Song::setName(std::string name)
 size_t Song::notesCount() const
 {
     return 256;
+}
+
+unsigned int Song::patternsPerTrack() const
+{
+    return m_patterns_per_track;
 }
 
 }

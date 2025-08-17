@@ -3,38 +3,22 @@
 namespace gui
 {
 
-static size_t SONG_INDEX { 0 };
-static size_t TRACK_INDEX { 0 };
-static size_t INSTRUMENT_INDEX { 0 };
-
-size_t GuiState::songIndex()
+GuiState& GuiState::instance()
 {
-    return SONG_INDEX;
+    static GuiState instance;
+    return instance;
 }
 
-void GuiState::setSongIndex(size_t index)
+GuiState::GuiState()
+    : selected_color(ImColor { 0xb9, 0x00, 0xff, 64 })
+    , idle_color(ImColor { 0xea, 0xb2, 0xff, 64 })
+    , hovered_color(ImColor { 0xb9, 0x00, 0xff, 128 })
+    , song_index(0)
+    , track_index(0)
+    , instrument_index(0)
+    , pattern_index(0)
+    , pattern_playing(false)
 {
-    SONG_INDEX = index;
-}
-
-size_t GuiState::trackIndex()
-{
-    return TRACK_INDEX;
-}
-
-void GuiState::setTrackIndex(size_t index)
-{
-    TRACK_INDEX = index;
-}
-
-size_t GuiState::instrumentIndex()
-{
-    return INSTRUMENT_INDEX;
-}
-
-void GuiState::setInstrumentIndex(size_t index)
-{
-    INSTRUMENT_INDEX = index;
 }
 
 }

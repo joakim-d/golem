@@ -2,22 +2,21 @@
 
 #include <cstddef>
 
-#include <golem/domain/Note.h>
-
 namespace domain
 {
+class Pattern;
 class IProjectRepository;
 }
 
 namespace use_cases
 {
 
-class AddNote
+class GetPattern
 {
 public:
-    AddNote(domain::IProjectRepository& project_repository);
+    GetPattern(domain::IProjectRepository& project_repository);
 
-    void execute(size_t pattern_index, size_t note_index, domain::Note note);
+    domain::Pattern* operator()(size_t index);
 
 private:
     domain::IProjectRepository& m_project_repository;

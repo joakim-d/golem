@@ -25,5 +25,6 @@ ImVec2 operator-(ImVec2 l, ImVec2 r);
 bool IsMouseChildClicked(ImGuiMouseButton button);
 bool IsMouseChildDown(ImGuiMouseButton button);
 ImVec2 GetMouseToWindowPosition();
+ImColor getClickableItemColor(bool is_already_selected);
 
 }

@@ -12,6 +12,9 @@ Project::Project()
     auto instrument = Instrument {};
     instrument.setName("Instrument 1");
     m_instruments.push_back(std::move(instrument));
+
+    Pattern pattern { 16 };
+    m_patterns.resize(16, pattern);
 }
 
 void Project::addSong(Song song)
@@ -44,6 +47,16 @@ Instrument* Project::instrument(size_t index)
     return &m_instruments[index];
 }
 
+Pattern* Project::pattern(size_t index)
+{
+    if (index >= m_patterns.size())
+    {
+        return nullptr;
+    }
+
+    return &m_patterns[index];
+}
+
 const std::vector<Instrument>& Project::getInstruments() const
 {
     return m_instruments;
@@ -52,6 +65,16 @@ const std::vector<Instrument>& Project::getInstruments() const
 const std::vector<Song>& Project::getSongs() const
 {
     return m_songs;
+}
+
+size_t Project::maxPatterns() const
+{
+    return m_patterns.size();
+}
+
+void Project::setMaxPatterns(size_t max_patterns)
+{
+    m_patterns.resize(max_patterns, Pattern { 16 });
 }
 
 }

@@ -20,7 +20,7 @@ size_t GetNotesPerPhrase::operator()(size_t song_index)
         return 0;
     }
 
-    return song->notesPerPhrase();
+    return song->notesPerPattern();
 }
 
 }
