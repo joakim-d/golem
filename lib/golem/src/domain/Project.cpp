@@ -14,11 +14,6 @@ Project::Project()
     m_instruments.push_back(std::move(instrument));
 
     Pattern pattern { 16 };
-    pattern.setNote(0, Note { NoteFrequency::A3, 1, 0 });
-    for (int i = 0; i < 16; ++i)
-    {
-        pattern.setNote(i, Note { static_cast<NoteFrequency>(i), 1, 0 });
-    }
     m_patterns.resize(16, pattern);
 }
 
