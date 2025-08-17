@@ -51,7 +51,13 @@ private:
     core::NotePlayer& m_note_player;
     utils::observable_handle m_tick_handle;
 
+    struct ChannelPlayStatus
+    {
+        unsigned duration_left;
+    };
+
     domain::PlaybackInfo m_global_status;
+    ChannelPlayStatus m_channel_statuses[4]; // one status per track;
 };
 
 }
