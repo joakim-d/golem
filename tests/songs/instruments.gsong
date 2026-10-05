@@ -1,0 +1,42 @@
+# Every instrument type: pulse sweep, length and duty; wave volumes and wave switches;
+# both noise LFSR widths; the lowest and highest notes.
+ticks_per_row 04
+
+pulse 1 00 80 F3            # 50% duty, no sweep, no length
+pulse 2 9A 3F A1            # length enable, sweep pace 1 down 2 steps, 12.5% duty, length 3F
+pulse 3 00 C0 69            # 75% duty, envelope rising from 6
+wave_instrument 1 00 20     # 100%, wave 0
+wave_instrument 2 80 C1     # length 80 enabled, 50%, wave 1
+wave_instrument 3 00 62     # 25%, wave 2
+noise 1 00 F1               # 15-bit LFSR
+noise 2 BF 82               # 7-bit LFSR, length 3F not enabled
+wave 0 0123456789ABCDEFFEDCBA9876543210
+wave 1 FFFFFFFFFFFFFFFF0000000000000000
+wave 2 02468ACEFFFFFFFFECA8642000000000
+
+order 01 02 03 04
+
+pattern 01
+00 C-2 1 ...
+08 B-7 2 ...
+10 A-4 3 ...
+18 E-5 . ...                # keeps instrument 3
+20 C#3 1 ...
+
+pattern 02
+04 G-4 2 ...                # sweep byte ignored on channel 2, length enable kept
+0C D-6 3 ...
+14 C-2 1 ...
+
+pattern 03
+00 C-4 1 ...
+04 C-4 1 ...                # wave 0 already loaded
+08 E-4 2 ...                # loads wave 1
+0C G-4 3 ...                # loads wave 2
+10 C-5 1 ...                # loads wave 0 again
+
+pattern 04
+00 C-2 1 ...
+02 C-5 2 ...
+04 B-7 1 ...
+06 F#4 2 ...

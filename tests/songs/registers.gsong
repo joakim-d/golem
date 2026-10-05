@@ -1,0 +1,48 @@
+# Register effects: master volume (5), panning (8), timbre (9) and volume (C), both on their
+# own and folded into a note trigger on the same row. Also the no-op call routine (6).
+ticks_per_row 04
+
+pulse 1 00 80 F3
+pulse 2 80 40 A7
+wave_instrument 1 00 20     # wave 0
+wave_instrument 2 00 21     # wave 1
+noise 1 00 F1
+wave 0 0123456789ABCDEFFEDCBA9876543210
+wave 1 FFFFFFFFFFFFFFFF0000000000000000
+wave 2 02468ACEFFFFFFFFECA8642000000000
+
+order 01 02 03 04
+
+pattern 01
+00 C-4 1 577
+04 --- . 530
+08 E-4 1 9C0                # 75% duty folded into the trigger
+0C --- . 900                # 12.5% duty, no retrigger
+10 G-4 1 CA3                # volume folded into the trigger
+14 --- . C51                # volume with retrigger
+18 --- . 8F0
+1C --- . 577
+
+pattern 02
+00 E-4 2 8FF
+06 --- . 8ED
+0A G-4 2 C80
+0E --- . C3F
+12 --- . 980
+
+pattern 03
+00 C-4 1 ...
+04 --- . 901                # load wave 1 and retrigger
+08 --- . 901                # already loaded: no writes
+0C --- . C20                # 50% output
+10 E-4 1 902                # wave 2 folded into the trigger
+14 --- . C30
+18 G-4 2 C10
+
+pattern 04
+00 C-4 1 ...
+04 --- . 901                # 7-bit LFSR
+08 --- . 900
+0C --- . C82
+10 D-4 1 901                # 7-bit LFSR folded into the trigger
+14 --- . 6FF                # call routine: no-op

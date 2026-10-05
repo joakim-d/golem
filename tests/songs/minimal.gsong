@@ -1,0 +1,12 @@
+# One note per channel on the first row, then silence until the song loops.
+ticks_per_row 06
+
+pulse 1 00 80 F3
+wave_instrument 1 00 20
+noise 1 00 F1
+wave 0 0123456789ABCDEFFEDCBA9876543210
+
+order 00 00 00 00
+
+pattern 00
+00 C-4 1 ...

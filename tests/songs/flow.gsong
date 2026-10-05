@@ -1,0 +1,25 @@
+# Flow control: tempo changes (F), pattern break (D), position jump (B) and the loop back
+# to order 0, which keeps the last tempo.
+ticks_per_row 03
+
+pulse 1 00 80 F3
+
+order 01 00 00 00
+order 02 00 00 00
+order 03 00 00 00
+
+pattern 00
+
+pattern 01
+00 C-4 1 ...
+04 D-4 1 F02                # 2 ticks per row from row 05
+08 E-4 1 D10                # continue at order 1, row 10
+
+pattern 02
+10 F-4 1 ...
+14 G-4 1 F04
+18 A-4 1 B02                # continue at order 2, row 00
+
+pattern 03
+00 B-4 1 ...
+20 C-5 1 ...
