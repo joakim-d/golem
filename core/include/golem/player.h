@@ -43,6 +43,8 @@ private:
         std::uint16_t pitch = 0; // Period in NRx3/NRx4: `period`, or an arpeggio step.
         std::optional<std::uint8_t> arpeggio; // Parameter of the current row's 0.
         std::optional<int> portamento; // Period change per tick of the row's 1 (+) or 2 (-).
+        std::optional<std::uint16_t> target; // Period a 3 slides toward, until the next note.
+        std::optional<std::uint8_t> tone_portamento; // Step per tick of the row's 3.
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
@@ -83,6 +85,14 @@ private:
     // One non-row tick of 1 or 2: the channel's period moves by the step, clamped to the
     // note table (C-2 to B-7), and stays there; written like an arpeggio step on a change.
     void portamento_step(std::size_t channel);
+    // One non-row tick of 3: the channel's period moves toward its target by the step,
+    // without passing it; written like a portamento step on a change.
+    void tone_portamento_step(std::size_t channel);
+    // True if the cell's note triggers on the row tick: not delayed by 7, and not a 3
+    // target on a channel that already plays a note.
+    bool triggers_on_row_tick(
+        std::size_t channel,
+        const Cell& cell) const;
     // Writes `period` to NRx3/NRx4 of channel 1-3 without the trigger bit.
     void write_pitch(
         std::size_t channel,
