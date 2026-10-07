@@ -12,6 +12,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [05](05-flow.md) | Tempo (F), position jump (B), pattern break (D) | `driver.flow`, `driver.jumps` | Done |
 | [06](06-register-effects.md) | Effects 5, 6, 8, 9, C on every channel, folded triggers | `driver.registers`, `driver.effects` | Done |
 | [07](07-budgets.md) | Cycle and size budgets enforced by the tests | Cycle limit in every `driver.*` test, `driver.size` | Done |
+| [08](08-note-cut.md) | Note cut (E), the first timed effect | `driver.cut` | Done |
 
 ## Rules for every step
 
@@ -24,7 +25,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 
 These effects are not specified yet. For each one, the contract, the reference player and a golden trace come first, then the driver step:
 
-- E (note cut) and 7 (note delay), which are timed effects
+- 7 (note delay), the other timed effect
 - 0 (arpeggio)
 - 1, 2, 3 (portamento up, down, and tone portamento)
 - 4 (vibrato)

@@ -1,0 +1,36 @@
+# Note cut (E): the same writes as C00, at tick xx of the row. Cuts at tick 0 (after the
+# trigger), at later ticks and without a note; a cut at or past the row's length does
+# nothing; cuts on every channel; two channels cutting on the same tick (channel order);
+# F on the same row keeps that row's length; notes after a cut play normally. F02 at row 14
+# makes the loop play at tempo 2, where the E02 and E03 cuts fall past the row.
+ticks_per_row 04
+
+pulse 1 00 80 F3
+pulse 2 80 40 A7            # length enabled
+wave_instrument 1 00 20
+noise 1 40 F1               # length enabled
+wave 0 0123456789ABCDEFFEDCBA9876543210
+
+order 01 02 03 04
+
+pattern 01                  # channel 1
+00 C-4 1 E00                # trigger, then cut in the same frame
+04 E-4 . E02
+08 G-4 . ...                # plays normally after a cut
+09 --- . E03                # cut without a note
+0C A-4 . E04                # at the row's length: no cut
+10 C-5 . E01                # same tick as channel 2
+
+pattern 02                  # channel 2
+00 E-4 2 E01
+10 G-4 . E01
+14 --- . F02                # tempo 2 from row 15
+
+pattern 03                  # channel 3
+00 C-4 1 E02
+14 A-4 . E03                # row 14 keeps its 4 ticks: cut at tick 3
+
+pattern 04                  # channel 4
+04 C-4 1 E01
+18 D-4 . E02                # tempo 2 now: no cut
+1C E-4 . E01

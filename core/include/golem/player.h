@@ -34,6 +34,7 @@ private:
         std::uint8_t instrument = 1;
         std::uint16_t period = 0;
         std::uint8_t noise = 0; // NR43 without the width bit, for the last note (channel 4).
+        std::optional<unsigned> cut_tick; // Tick of the current row with a pending E.
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
@@ -54,6 +55,12 @@ private:
     void apply_effect(
         std::size_t channel,
         const Cell& cell);
+    // C without a note: NRx2 = param then retrigger (channels 1, 2, 4), NR32 (channel 3).
+    void set_volume(
+        std::size_t channel,
+        std::uint8_t param);
+    // E: silences the channel like C00.
+    void cut(std::size_t channel);
     void load_wave(std::uint8_t index);
     std::uint8_t length_enable_bit(std::size_t channel) const;
     void write(

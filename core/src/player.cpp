@@ -21,6 +21,7 @@ namespace {
         kPositionJump = 0xB,
         kSetVolume = 0xC,
         kPatternBreak = 0xD,
+        kNoteCut = 0xE,
         kSetTempo = 0xF,
     };
 
@@ -49,6 +50,7 @@ namespace {
         case kPositionJump:
         case kSetVolume:
         case kPatternBreak:
+        case kNoteCut:
         case kSetTempo:
             return true;
         default:
@@ -95,7 +97,17 @@ std::vector<ApuWrite> Player::step()
     } else {
         if (tick_ == 0) {
             row_length_ = ticks_per_row_;
+            for (auto& channel : channels_) {
+                channel.cut_tick.reset();
+            }
             play_row();
+        } else {
+            for (std::size_t channel = 0; channel < kChannels; ++channel) {
+                if (channels_[channel].cut_tick == tick_) {
+                    channels_[channel].cut_tick.reset();
+                    cut(channel);
+                }
+            }
         }
         if (++tick_ == row_length_) {
             tick_ = 0;
@@ -241,14 +253,13 @@ void Player::apply_effect(
         }
         break;
     case kSetVolume:
-        if (channel == kPulse1 || channel == kPulse2) {
-            write(pulse_base(channel) + 2, cell.param);
-            write(pulse_base(channel) + 4, kTrigger | length | high(state.period));
-        } else if (channel == kWave) {
-            write(reg::NR32, wave_volume(cell.param));
-        } else {
-            write(reg::NR42, cell.param);
-            write(reg::NR44, kTrigger | length);
+        set_volume(channel, cell.param);
+        break;
+    case kNoteCut:
+        if (cell.param == 0) {
+            cut(channel);
+        } else if (cell.param < row_length_) {
+            channels_[channel].cut_tick = cell.param;
         }
         break;
     case kPositionJump:
@@ -263,6 +274,28 @@ void Player::apply_effect(
     default: // kCallRoutine
         break;
     }
+}
+
+void Player::set_volume(
+    std::size_t channel,
+    std::uint8_t param)
+{
+    const Channel& state = channels_[channel];
+    const std::uint8_t length = length_enable_bit(channel);
+    if (channel == kPulse1 || channel == kPulse2) {
+        write(pulse_base(channel) + 2, param);
+        write(pulse_base(channel) + 4, kTrigger | length | high(state.period));
+    } else if (channel == kWave) {
+        write(reg::NR32, wave_volume(param));
+    } else {
+        write(reg::NR42, param);
+        write(reg::NR44, kTrigger | length);
+    }
+}
+
+void Player::cut(std::size_t channel)
+{
+    set_volume(channel, 0x00);
 }
 
 void Player::load_wave(std::uint8_t index)

@@ -92,6 +92,7 @@ golem_driver_test(flow) # Step 5
 golem_driver_test(jumps) # Step 5
 golem_driver_test(registers) # Step 6
 golem_driver_test(effects) # Step 6
+golem_driver_test(cut) # Step 8
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
 
