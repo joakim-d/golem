@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 8, all channels, flow, register effects, note cut).
+; Current scope: docs/driver-steps/ (step 9, all channels, flow, register and timed effects).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -18,6 +18,7 @@ DEF WAVE_CHANNEL EQU 2 ; 0-based
 DEF NOISE_CHANNEL EQU 3
 DEF ROWS_PER_PATTERN EQU 64
 DEF EFFECT_SET_MASTER_VOLUME EQU $5
+DEF EFFECT_NOTE_DELAY EQU $7
 DEF EFFECT_SET_PANNING EQU $8
 DEF EFFECT_CHANGE_TIMBRE EQU $9
 DEF EFFECT_POSITION_JUMP EQU $B
@@ -28,6 +29,7 @@ DEF EFFECT_SET_TEMPO EQU $F
 DEF WAVE_BYTES EQU 16
 DEF NO_WAVE EQU $FF
 DEF NO_CUT EQU 0 ; Tick 0 is never pending: E00 cuts at once.
+DEF NO_DELAY EQU 0 ; Tick 0 is never pending: 700 triggers at once.
 
 ; wFlow bits: flow effects waiting for the end of the row.
 DEF FLOW_JUMP EQU 0 ; B: continue at wJumpOrder.
@@ -63,8 +65,14 @@ wParam: ds 1 ; Its parameter.
 wOverride: ds 1 ; OVERRIDE_TIMBRE and OVERRIDE_VOLUME flags.
 wChannels: ds CHANNEL_SIZE * CHANNELS
 wLoadedWave: ds 1 ; Wave in wave RAM, or NO_WAVE.
-wCutTicks: ds CHANNELS ; Per channel: tick of a pending E in the current row, or NO_CUT.
-wCutPending: ds 1 ; Non-zero if any channel has a pending cut in the current row.
+; Timed effects of the current row, per channel. Kept in this order (see the ASSERTs).
+wCutTicks: ds CHANNELS ; Tick of a pending E, or NO_CUT.
+wDelayTicks: ds CHANNELS ; Tick of a pending 7, or NO_DELAY.
+wDelayNotes: ds CHANNELS ; Note of that pending 7.
+wTimedPending: ds 1 ; Non-zero if any channel has a pending E or 7 in the current row.
+
+ASSERT wDelayTicks == wCutTicks + CHANNELS, "ClearTimed and PlayTimed assume this layout"
+ASSERT wDelayNotes == wDelayTicks + CHANNELS, "PlayCell and PlayTimed assume this layout"
 
 SECTION "Golem driver", ROM0
 GolemInit::
@@ -86,7 +94,7 @@ GolemInit::
 	ld [wFlow], a
 	ld a, NO_WAVE
 	ld [wLoadedWave], a
-	call ClearCuts
+	call ClearTimed
 	; Every channel starts with instrument 1, period 0 and noise value 0.
 	ld hl, wChannels
 	ld b, CHANNELS
@@ -115,11 +123,11 @@ GolemPlay::
 	; Row tick. The row keeps the tempo it starts with: F only changes the next row.
 	ld a, [wTicksPerRow]
 	ld [wRowLength], a
-	call ClearCuts
+	call ClearTimed
 	call PlayRow
 	jr .tick
 .nonRowTick
-	call PlayCuts
+	call PlayTimed
 .tick
 	; Next tick. Comparing with the raw row length makes 0 mean 256: the tick wraps
 	; from 255 to 0.
@@ -268,6 +276,35 @@ PlayCell:
 	set FLOW_BREAK, [hl]
 
 .override
+	; 7 xx with a note: the trigger moves to tick xx of the row, or is dropped past it.
+	ld a, b
+	and a
+	jr z, .noDelay
+	ld a, [wEffect]
+	cp EFFECT_NOTE_DELAY
+	jr nz, .noDelay
+	ld a, [wParam]
+	and a
+	jr z, .noDelay ; 700: an ordinary trigger.
+	ld c, a
+	ld a, [wRowLength]
+	and a
+	jr z, .pendingDelay ; 256-tick row: every tick 1-255 is in the row.
+	cp c
+	ret c ; Row length < xx: dropped.
+	ret z ; Row length = xx: dropped.
+.pendingDelay
+	call CutTickAddress
+	ld de, CHANNELS
+	add hl, de ; wDelayTicks
+	ld [hl], c
+	add hl, de ; wDelayNotes
+	ld [hl], b
+	ld a, 1
+	ld [wTimedPending], a
+	ret
+
+.noDelay
 	; 9 or C on a row with a note change the trigger instead of making their own writes.
 	ld d, 0
 	ld a, b
@@ -288,7 +325,7 @@ PlayCell:
 
 	ld a, b
 	and a
-	jr z, ApplyEffect
+	jp z, ApplyEffect
 	call Trigger
 	ld a, [wOverride]
 	and a
@@ -306,13 +343,13 @@ ApplyEffect:
 	cp EFFECT_CHANGE_TIMBRE
 	jr z, .timbre
 	cp EFFECT_SET_VOLUME
-	jr z, SetVolume
+	jp z, SetVolume
 	cp EFFECT_NOTE_CUT
 	ret nz
 	; E: cut now (E00), or at tick xx of this row if the row is that long.
 	ld a, [wParam]
 	and a
-	jr z, Cut
+	jp z, Cut
 	ld b, a
 	ld a, [wRowLength]
 	and a
@@ -324,7 +361,7 @@ ApplyEffect:
 	call CutTickAddress
 	ld [hl], b
 	ld a, 1
-	ld [wCutPending], a
+	ld [wTimedPending], a
 	ret
 .timbre
 	ld a, [wChannel]
@@ -352,14 +389,15 @@ Cut:
 SetVolume:
 	ld a, [wChannel]
 	cp WAVE_CHANNEL
-	jr z, WaveSetVolume
+	jp z, WaveSetVolume
 	cp NOISE_CHANNEL
-	jr z, NoiseSetVolume
-	jr PulseSetVolume
+	jp z, NoiseSetVolume
+	jp PulseSetVolume
 
-; Writes the cuts due at tick wTick, in channel order (non-row ticks).
-PlayCuts:
-	ld a, [wCutPending]
+; Writes the cuts (E) and delayed triggers (7) due at tick wTick, in channel order
+; (non-row ticks). A channel has at most one: a cell holds a single effect.
+PlayTimed:
+	ld a, [wTimedPending]
 	and a
 	ret z ; Most ticks: nothing to check.
 	xor a
@@ -368,9 +406,21 @@ PlayCuts:
 	call CutTickAddress
 	ld a, [wTick]
 	cp [hl]
-	jr nz, .next
+	jr nz, .delay
 	ld [hl], NO_CUT
 	call Cut
+	jr .next
+.delay
+	ld de, CHANNELS
+	add hl, de ; wDelayTicks
+	cp [hl]
+	jr nz, .next
+	ld [hl], NO_DELAY
+	add hl, de ; wDelayNotes
+	ld b, [hl]
+	xor a ; The cell's effect is 7: no 9 or C to fold.
+	ld [wOverride], a
+	call Trigger
 .next
 	ld a, [wChannel]
 	inc a
@@ -378,17 +428,17 @@ PlayCuts:
 	jr nz, .channel
 	ret
 
-; Clears every pending cut (row tick). Clobbers af, b, hl.
-ClearCuts:
+; Clears every pending cut and delay (row tick). Clobbers af, b, hl.
+ClearTimed:
+	ASSERT NO_CUT == 0 && NO_DELAY == 0
 	ld hl, wCutTicks
-	ld b, CHANNELS
-	ld a, NO_CUT
+	ld b, 2 * CHANNELS ; wCutTicks and wDelayTicks
+	xor a
 .channel
 	ld [hl+], a
 	dec b
 	jr nz, .channel
-	xor a
-	ld [wCutPending], a
+	ld [wTimedPending], a
 	ret
 
 ; Out: hl = pending cut tick of channel wChannel. Clobbers af.
@@ -472,7 +522,7 @@ NoiseTimbre:
 Trigger:
 	ld a, [wChannel]
 	cp WAVE_CHANNEL
-	jr z, TriggerWave
+	jp z, TriggerWave
 	cp NOISE_CHANNEL
 	jp z, TriggerNoise
 	jp TriggerPulse

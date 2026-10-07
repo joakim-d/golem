@@ -83,6 +83,8 @@ Effects fall into three groups by when they act. This refines "Effects run on ev
 |---|---|---|
 | 5 Set master volume | `NR50=xx` | After the trigger: `NR50=xx` |
 | 6 Call routine | Nothing | Nothing |
+| 7 Note delay, `xx` = 0 | Nothing | An ordinary trigger |
+| 7 Note delay, `xx` ≥ 1 | Nothing | No trigger on the row tick. At tick `xx` of the row: the trigger, with the instrument the row selected. Dropped if `xx` ≥ the row's length |
 | 8 Set panning | `NR51=xx` | After the trigger: `NR51=xx` |
 | 9 Change timbre, ch1–2 | `NRx1=xx` | The trigger writes `xx` to `NRx1` |
 | 9 Change timbre, ch3 | Wave `y`: [wave load], `NR30=$80`, `NR34`=`$80` \| len \| period bits 10–8. Nothing if wave `y` is already loaded | The trigger uses wave `y` |
@@ -98,7 +100,8 @@ Further rules:
 - **9 and C last one note.** Their values are not remembered: the next trigger takes the instrument's values again.
 - **No-note fallbacks.** When there is no previous note, "period" and "noise value of the last note" are 0.
 - **Note cut (E):** the cut makes the writes of C00: ch1, 2, 4: `NRx2=$00`, then the retrigger; ch3: `NR32=$00`. The row's length is the one it started with: an F on the same row does not change it. Cuts due on the same tick are written in channel order, on non-row ticks before anything else.
-- **Not specified yet:** effects 0–4, 7 and A (all except an empty cell). The reference player rejects them (`golem::UnsupportedEffect`).
+- **Note delay (7):** the instrument column still applies on the row tick (it makes no writes). The delayed trigger sets the channel's period and noise value at the tick it happens. Delayed triggers and cuts due on the same tick are written in channel order (a channel has at most one, since a cell holds a single effect). A pending delay or cut never outlives its row.
+- **Not specified yet:** effects 0–4 and A (all except an empty cell). The reference player rejects them (`golem::UnsupportedEffect`).
 
 ## Flow control
 
