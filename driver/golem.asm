@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 4, all four channels).
+; Current scope: docs/driver-steps/ (step 5, all four channels and flow control).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -17,9 +17,16 @@ DEF CHANNELS EQU 4
 DEF WAVE_CHANNEL EQU 2 ; 0-based
 DEF NOISE_CHANNEL EQU 3
 DEF ROWS_PER_PATTERN EQU 64
+DEF EFFECT_POSITION_JUMP EQU $B
 DEF EFFECT_SET_VOLUME EQU $C
+DEF EFFECT_PATTERN_BREAK EQU $D
+DEF EFFECT_SET_TEMPO EQU $F
 DEF WAVE_BYTES EQU 16
 DEF NO_WAVE EQU $FF
+
+; wFlow bits: flow effects waiting for the end of the row.
+DEF FLOW_JUMP EQU 0 ; B: continue at wJumpOrder.
+DEF FLOW_BREAK EQU 1 ; D: continue at row wBreakRow.
 
 ; Per-channel state, CHANNEL_SIZE bytes each in wChannels.
 RSRESET
@@ -31,11 +38,15 @@ ASSERT CHANNEL_SIZE == 4, "ChannelState and GolemInit assume 4 bytes per channel
 
 SECTION "Golem state", WRAM0
 wSong: ds 2
-wTicksPerRow: ds 1 ; Raw header value: 0 means 256.
+wTicksPerRow: ds 1 ; Tempo: raw header or F value, 0 means 256.
+wRowLength: ds 1 ; Tempo when the current row started.
 wTick: ds 1
 wRow: ds 1
 wOrder: ds 1
 wOrderCount: ds 1
+wFlow: ds 1 ; FLOW_JUMP and FLOW_BREAK flags.
+wJumpOrder: ds 1
+wBreakRow: ds 1
 wChannel: ds 1 ; Channel being played, 0-based.
 wChannels: ds CHANNEL_SIZE * CHANNELS
 wLoadedWave: ds 1 ; Wave in wave RAM, or NO_WAVE.
@@ -57,6 +68,7 @@ GolemInit::
 	ld [wTick], a
 	ld [wRow], a
 	ld [wOrder], a
+	ld [wFlow], a
 	ld a, NO_WAVE
 	ld [wLoadedWave], a
 	; Every channel starts with instrument 1 and period 0.
@@ -83,11 +95,15 @@ GolemInit::
 GolemPlay::
 	ld a, [wTick]
 	and a
-	call z, PlayRow
-
-	; Next tick. Comparing with the raw ticks per row makes 0 mean 256: the tick wraps
-	; from 255 to 0.
+	jr nz, .tick
+	; Row tick. The row keeps the tempo it starts with: F only changes the next row.
 	ld a, [wTicksPerRow]
+	ld [wRowLength], a
+	call PlayRow
+.tick
+	; Next tick. Comparing with the raw row length makes 0 mean 256: the tick wraps
+	; from 255 to 0.
+	ld a, [wRowLength]
 	ld b, a
 	ld a, [wTick]
 	inc a
@@ -98,6 +114,9 @@ GolemPlay::
 .nextRow
 	xor a
 	ld [wTick], a
+	ld a, [wFlow]
+	and a
+	jr nz, .flow
 	ld a, [wRow]
 	inc a
 	cp ROWS_PER_PATTERN
@@ -116,6 +135,39 @@ GolemPlay::
 	xor a ; Past the last order: loop to order 0.
 .storeOrder
 	ld [wOrder], a
+	ret
+
+.flow
+	; B and/or D on the row that just ended. a = wFlow.
+	ld b, a
+	xor a
+	ld [wFlow], a
+	; Order: B's target, else the next one. Out of range (also past the last order) is 0.
+	ld a, [wOrder]
+	inc a
+	bit FLOW_JUMP, b
+	jr z, .checkOrder
+	ld a, [wJumpOrder]
+.checkOrder
+	ld c, a
+	ld a, [wOrderCount]
+	ld d, a
+	ld a, c
+	cp d
+	jr c, .setOrder
+	xor a
+.setOrder
+	ld [wOrder], a
+	; Row: D's target, else 0. Out of range is 0.
+	xor a
+	bit FLOW_BREAK, b
+	jr z, .setRow
+	ld a, [wBreakRow]
+	cp ROWS_PER_PATTERN
+	jr c, .setRow
+	xor a
+.setRow
+	ld [wRow], a
 	ret
 
 ; Plays the current row of every channel, in channel order (row tick).
@@ -166,6 +218,31 @@ PlayCell:
 	call ChannelState
 	ld [hl], d ; CHANNEL_INSTRUMENT
 .instrumentDone
+	; Flow effects make no APU writes: record them whatever else the row does. A later
+	; channel overwrites an earlier one's target, so the highest channel wins.
+	ld a, c
+	and $0F
+	cp EFFECT_POSITION_JUMP
+	jr z, .positionJump
+	cp EFFECT_PATTERN_BREAK
+	jr z, .patternBreak
+	cp EFFECT_SET_TEMPO
+	jr nz, .channel
+	ld a, e
+	ld [wTicksPerRow], a
+	jr .channel
+.positionJump
+	ld a, e
+	ld [wJumpOrder], a
+	ld hl, wFlow
+	set FLOW_JUMP, [hl]
+	jr .channel
+.patternBreak
+	ld a, e
+	ld [wBreakRow], a
+	ld hl, wFlow
+	set FLOW_BREAK, [hl]
+.channel
 	ld a, [wChannel]
 	cp WAVE_CHANNEL
 	jr z, PlayWaveCell
