@@ -1,0 +1,43 @@
+# Driver step 5: the flow rules not covered by flow.gsong. B on a row with a note; B and D
+# from different channels on the same row; the highest channel winning for B (channels 1
+# and 3) and D (channels 2 and 4); out-of-range B and D; D on the last order wrapping; F00.
+# Path: order 0 row 00 -> order 2 row 05 -> order 0 row 3E -> order 1 row 00 -> order 0 ...
+ticks_per_row 02
+
+pulse 1 00 80 F0
+
+order 01 02 03 00
+order 04 05 00 06
+order 07 08 00 00
+
+pattern 00
+
+pattern 01                  # channel 1, order 0
+00 C-4 1 B01                # B with a note; channel 3 overrides it
+3E D-4 . ...
+3F F-4 . ...                # then order 1 by the normal row step
+
+pattern 02                  # channel 2, order 0
+00 --- . D05                # combines with the B of channel 3: order 2, row 05
+
+pattern 03                  # channel 3, order 0
+00 --- . B02                # highest channel wins over channel 1's B01
+
+pattern 04                  # channel 1, order 1
+00 A-4 . F00                # the next row lasts 256 frames
+01 B-4 . F02                # this row still lasts 256; tempo 2 afterwards
+02 C-5 . ...
+03 D-5 . B09                # out of range: order 0
+
+pattern 05                  # channel 2, order 1
+03 --- . D10                # overridden by channel 4
+
+pattern 06                  # channel 4, order 1
+03 --- . D50                # highest channel wins, out of range: row 00
+
+pattern 07                  # channel 1, order 2
+05 E-4 . ...
+06 G-4 . ...
+
+pattern 08                  # channel 2, order 2
+06 --- . D3E                # last order: wraps to order 0, row 3E
