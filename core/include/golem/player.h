@@ -39,6 +39,9 @@ private:
         std::uint8_t delay_note = 0; // and the note it triggers then.
         std::uint8_t volume = 0; // 0-15: NRx2 volume of the last trigger, C or slide step.
         std::optional<std::uint8_t> slide; // Parameter of the current row's A.
+        std::uint8_t note = 0; // Last note triggered (channels 1-3), 0 if none yet.
+        std::uint16_t pitch = 0; // Period in NRx3/NRx4: `period`, or an arpeggio step.
+        std::optional<std::uint8_t> arpeggio; // Parameter of the current row's 0.
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
@@ -68,6 +71,18 @@ private:
     // One non-row tick of A: volume up by x (or down by y), clamped to 0-15; on a change,
     // NRx2 = volume << 4 and a retrigger.
     void slide_volume(std::size_t channel);
+    // One non-row tick of 0 xy: the last note, + x or + y for tick % 3 = 0, 1, 2 (clamped to
+    // B-7); writes NRx3/NRx4 without retrigger when the pitch changes.
+    void arpeggio_step(std::size_t channel);
+    // Row tick: puts the pitch back to the last note's period (NRx3/NRx4, no retrigger),
+    // unless the cell triggers a note on this tick.
+    void restore_pitch(
+        std::size_t channel,
+        const Cell& cell);
+    // Writes `period` to NRx3/NRx4 of channel 1-3 without the trigger bit.
+    void write_pitch(
+        std::size_t channel,
+        std::uint16_t period);
     void load_wave(std::uint8_t index);
     std::uint8_t length_enable_bit(std::size_t channel) const;
     void write(

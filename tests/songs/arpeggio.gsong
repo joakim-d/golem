@@ -1,0 +1,33 @@
+# Arpeggio (0): on non-row tick t, the last note + x (t % 3 = 1) or + y (t % 3 = 2), else the
+# note itself; pitch writes (NRx3, NRx4 without the trigger bit) only when the period
+# changes; clamped to B-7. The next row tick restores the note's pitch before the cell's own
+# writes, unless that cell triggers on the row tick. Channels 1-3; ignored on channel 4.
+ticks_per_row 06
+
+pulse 1 00 80 F3
+pulse 2 80 40 A7            # length enabled
+wave_instrument 1 00 A0     # length enabled, 100%, wave 0
+noise 1 00 F1
+wave 0 0123456789ABCDEFFEDCBA9876543210
+
+order 01 02 03 04
+
+pattern 01                  # channel 1
+00 C-4 2 047                # C, E, G, C, E, G
+01 --- . 047                # restore C, then the same on the last note
+02 --- . C80                # restore C first, then C's retrigger
+03 E-4 . 037                # E, G, B
+04 G-4 . ...                # the trigger sets the pitch: no restore
+05 --- . 043                # B, A#, ..., ends on G + 3
+06 A-4 . 701                # restore G at the row tick, then the delayed trigger
+08 A-7 . 0F0                # + 15 clamps to B-7; y = 0 plays A-7 itself
+
+pattern 02                  # channel 2
+00 --- . 047                # no note yet: nothing
+03 C-5 1 0C0                # C-5 + 12 = C-6, on the same ticks as channel 1
+
+pattern 03                  # channel 3
+00 C-4 1 047                # wave channel: NR33/NR34
+
+pattern 04                  # channel 4
+00 C-4 1 047                # ignored on noise
