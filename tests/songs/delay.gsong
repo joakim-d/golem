@@ -1,0 +1,32 @@
+# Note delay (7): the row's trigger moves to tick xx, with the instrument the row selects.
+# 700 is an ordinary trigger; a delay at or past the row's length drops the note; 7 without
+# a note does nothing; a delayed trigger and a cut on the same tick are written in channel
+# order; a delayed wave trigger loads its wave then; a later retrigger uses the delayed
+# note's period.
+ticks_per_row 04
+
+pulse 1 00 80 F3
+pulse 2 80 40 A7            # length enabled
+wave_instrument 1 00 20
+noise 1 40 F1               # length enabled
+wave 0 0123456789ABCDEFFEDCBA9876543210
+
+order 01 02 03 04
+
+pattern 01                  # channel 1
+00 C-4 1 700                # ordinary trigger
+04 E-4 2 702                # instrument 2, triggered at tick 2
+08 G-4 . 704                # at the row's length: dropped
+0C --- . 702                # no note: nothing
+10 A-4 . 701                # tick 1, with channel 2's cut
+14 --- . C70                # retrigger with A-4's period
+
+pattern 02                  # channel 2
+10 C-4 1 E01                # cut at tick 1, after channel 1's delayed trigger
+
+pattern 03                  # channel 3
+04 C-4 1 703                # wave loaded at tick 3
+
+pattern 04                  # channel 4
+08 D-4 1 701
+18 E-4 . 703

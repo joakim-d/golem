@@ -440,7 +440,7 @@ TEST(
     Player,
     UnsupportedEffectsThrow)
 {
-    for (const char* effect : {"001", "1FF", "200", "301", "411", "701", "A10"}) {
+    for (const char* effect : {"001", "1FF", "200", "301", "411", "A10"}) {
         Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
         player.step();
         EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
@@ -535,6 +535,99 @@ TEST(
         "pattern 01\n00 A-4 2 F02\npattern 02\n00 A-4 2 E03\n");
     const auto frames = render(song, 5);
     EXPECT_EQ(frames[4], (Writes {{reg::NR22, 0x00}, {reg::NR24, 0x86}}));
+}
+
+// --- Note delay (7) ---
+
+TEST(
+    Player,
+    NoteDelayZeroTriggersOnTheRowTick)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 700\n", "04"), 2);
+    EXPECT_EQ(
+        frames[1],
+        (Writes {{reg::NR21, 0xC0}, {reg::NR22, 0xA2}, {reg::NR23, 0xD6}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    NoteDelayTriggersAtTickWithTheRowsInstrument)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 702\n", "04"), 5);
+    EXPECT_TRUE(frames[1].empty());
+    EXPECT_TRUE(frames[2].empty());
+    EXPECT_EQ(
+        frames[3],
+        (Writes {{reg::NR21, 0xC0}, {reg::NR22, 0xA2}, {reg::NR23, 0xD6}, {reg::NR24, 0x86}}));
+    EXPECT_TRUE(frames[4].empty());
+}
+
+TEST(
+    Player,
+    NoteDelayPastTheRowIsDropped)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 704\n", "04"), 12);
+    for (std::size_t frame = 1; frame < frames.size(); ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    NoteDelayWithoutANoteDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 --- 2 702\n", "04"), 8);
+    for (std::size_t frame = 1; frame < frames.size(); ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    DelayedTriggersAreWrittenInChannelOrder)
+{
+    const auto song =
+        make_song("ticks_per_row 04\norder 01 01 00 00\npattern 00\npattern 01\n00 A-4 2 701\n");
+    const auto frames = render(song, 3);
+    EXPECT_TRUE(frames[1].empty());
+    EXPECT_EQ(
+        frames[2],
+        (Writes {
+            {reg::NR10, 0x00},
+            {reg::NR11, 0xC0},
+            {reg::NR12, 0xA2},
+            {reg::NR13, 0xD6},
+            {reg::NR14, 0x86},
+            {reg::NR21, 0xC0},
+            {reg::NR22, 0xA2},
+            {reg::NR23, 0xD6},
+            {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    DelayedWaveTriggerLoadsTheWave)
+{
+    const auto frames = frames_of(on_channel(3, "00 A-4 1 701\n", "04"), 3);
+    EXPECT_TRUE(frames[1].empty());
+    EXPECT_EQ(
+        frames[2],
+        concat(
+            {wave_load(kWave1),
+             {{reg::NR30, 0x80},
+              {reg::NR31, 0x3F},
+              {reg::NR32, 0x20},
+              {reg::NR33, 0xD6},
+              {reg::NR34, 0xC6}}}));
+}
+
+TEST(
+    Player,
+    DelayedNoteSetsThePeriodForLaterRetriggers)
+{
+    // The C on row 1 retriggers with the delayed note's period (A-4: high bits 6).
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 702\n01 --- . C80\n", "04"), 6);
+    EXPECT_EQ(frames[5], (Writes {{reg::NR22, 0x80}, {reg::NR24, 0x86}}));
 }
 
 // --- Flow control ---

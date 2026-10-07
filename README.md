@@ -25,11 +25,11 @@ In Golem, the definition of correct behaviour exists before the driver code that
 |---|---|
 | Song format ([docs/song-format.md](docs/song-format.md)) | Specified |
 | Song model, text (`.gsong`) and binary loaders | Done |
-| Reference player: notes, instruments, effects 5 6 8 9 B C D E F | Done |
-| Reference player: effects 0–4, 7, A | To do |
+| Reference player: notes, instruments, effects 5 6 7 8 9 B C D E F | Done |
+| Reference player: effects 0–4, A | To do |
 | Trace tools (`golem-trace`, `golem-tracediff`) and golden traces | Done |
 | Emulator harness (`golem-run`, Peanut-GB) and driver test ROMs | Done |
-| Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Steps 0–8 done: every specified effect (5 6 8 9 B C D E F) |
+| Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Steps 0–9 done: every specified effect (5 6 7 8 9 B C D E F) |
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 2 KiB, WRAM ≤ 64 B) | Done |
 | Editor, WAV export | To do |
 

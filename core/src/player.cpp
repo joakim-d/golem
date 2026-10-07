@@ -16,6 +16,7 @@ namespace {
     enum Effect : std::uint8_t {
         kSetMasterVolume = 0x5,
         kCallRoutine = 0x6,
+        kNoteDelay = 0x7,
         kSetPanning = 0x8,
         kChangeTimbre = 0x9,
         kPositionJump = 0xB,
@@ -45,6 +46,7 @@ namespace {
         switch (effect) {
         case kSetMasterVolume:
         case kCallRoutine:
+        case kNoteDelay:
         case kSetPanning:
         case kChangeTimbre:
         case kPositionJump:
@@ -99,13 +101,20 @@ std::vector<ApuWrite> Player::step()
             row_length_ = ticks_per_row_;
             for (auto& channel : channels_) {
                 channel.cut_tick.reset();
+                channel.delay_tick.reset();
             }
             play_row();
         } else {
+            // Timed effects due on this tick (E, 7), in channel order. A channel has at
+            // most one: a cell holds a single effect.
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
-                if (channels_[channel].cut_tick == tick_) {
-                    channels_[channel].cut_tick.reset();
+                Channel& state = channels_[channel];
+                if (state.cut_tick == tick_) {
+                    state.cut_tick.reset();
                     cut(channel);
+                } else if (state.delay_tick == tick_) {
+                    state.delay_tick.reset();
+                    trigger(channel, state.delay_note, {});
                 }
             }
         }
@@ -168,6 +177,14 @@ void Player::play_cell(
         channels_[channel].instrument = cell.instrument;
     }
     const bool has_effect = !is_empty_effect(cell);
+    if (cell.note != kNoteNone && cell.effect == kNoteDelay && cell.param != 0) {
+        // 7: the trigger moves to tick xx of the row, or is dropped past the row.
+        if (cell.param < row_length_) {
+            channels_[channel].delay_tick = cell.param;
+            channels_[channel].delay_note = cell.note;
+        }
+        return;
+    }
     if (cell.note != kNoteNone) {
         Overrides overrides;
         if (has_effect && cell.effect == kChangeTimbre) {

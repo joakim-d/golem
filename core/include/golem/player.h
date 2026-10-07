@@ -35,6 +35,8 @@ private:
         std::uint16_t period = 0;
         std::uint8_t noise = 0; // NR43 without the width bit, for the last note (channel 4).
         std::optional<unsigned> cut_tick; // Tick of the current row with a pending E.
+        std::optional<unsigned> delay_tick; // Tick of the current row with a pending 7,
+        std::uint8_t delay_note = 0; // and the note it triggers then.
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
