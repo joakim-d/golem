@@ -440,11 +440,101 @@ TEST(
     Player,
     UnsupportedEffectsThrow)
 {
-    for (const char* effect : {"001", "1FF", "200", "301", "411", "701", "A10", "E01"}) {
+    for (const char* effect : {"001", "1FF", "200", "301", "411", "701", "A10"}) {
         Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
         player.step();
         EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
     }
+}
+
+// --- Note cut (E) ---
+
+TEST(
+    Player,
+    NoteCutAtTickZeroFollowsTheTrigger)
+{
+    const auto frames = frames_of(on_channel(1, "00 A-4 1 E00\n", "04"), 3);
+    EXPECT_EQ(
+        frames[1],
+        (Writes {
+            {reg::NR10, 0x7B},
+            {reg::NR11, 0x81},
+            {reg::NR12, 0xF3},
+            {reg::NR13, 0xD6},
+            {reg::NR14, 0xC6},
+            {reg::NR12, 0x00},
+            {reg::NR14, 0xC6}}));
+    EXPECT_TRUE(frames[2].empty());
+}
+
+TEST(
+    Player,
+    NoteCutAtALaterTick)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 E02\n", "04"), 5);
+    EXPECT_EQ(frames[1].size(), 4u); // The trigger only.
+    EXPECT_TRUE(frames[2].empty());
+    EXPECT_EQ(frames[3], (Writes {{reg::NR22, 0x00}, {reg::NR24, 0x86}}));
+    EXPECT_TRUE(frames[4].empty());
+}
+
+TEST(
+    Player,
+    NoteCutWithoutANoteCutsThePlayingNote)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 ...\n01 --- . E01\n", "04"), 7);
+    EXPECT_TRUE(frames[5].empty()); // Row 1's row tick.
+    EXPECT_EQ(frames[6], (Writes {{reg::NR22, 0x00}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    NoteCutPastTheRowDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 E04\n", "04"), 12);
+    for (std::size_t frame = 2; frame < frames.size(); ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    NoteCutOnTheWaveChannel)
+{
+    const auto frames = frames_of(on_channel(3, "00 A-4 1 E01\n", "04"), 3);
+    EXPECT_EQ(frames[2], (Writes {{reg::NR32, 0x00}}));
+}
+
+TEST(
+    Player,
+    NoteCutOnTheNoiseChannel)
+{
+    const auto frames = frames_of(on_channel(4, "00 A-4 1 E01\n", "04"), 3);
+    EXPECT_EQ(frames[2], (Writes {{reg::NR42, 0x00}, {reg::NR44, 0xC0}}));
+}
+
+TEST(
+    Player,
+    NoteCutsAreWrittenInChannelOrder)
+{
+    const auto song =
+        make_song("ticks_per_row 04\norder 01 01 00 00\npattern 00\npattern 01\n00 A-4 2 E01\n");
+    const auto frames = render(song, 3);
+    EXPECT_EQ(
+        frames[2],
+        (Writes {{reg::NR12, 0x00}, {reg::NR14, 0x86}, {reg::NR22, 0x00}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    NoteCutUsesTheLengthTheRowStartedWith)
+{
+    // F02 on channel 1 shortens the next row only: the cut at tick 3 still happens.
+    const auto song = make_song(
+        "ticks_per_row 04\norder 01 02 00 00\npattern 00\n"
+        "pattern 01\n00 A-4 2 F02\npattern 02\n00 A-4 2 E03\n");
+    const auto frames = render(song, 5);
+    EXPECT_EQ(frames[4], (Writes {{reg::NR22, 0x00}, {reg::NR24, 0x86}}));
 }
 
 // --- Flow control ---

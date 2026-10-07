@@ -89,13 +89,16 @@ Effects fall into three groups by when they act. This refines "Effects run on ev
 | 9 Change timbre, ch4 | `NR43`=noise value of the last note \| (`xx`≠0 ? `$08` : 0) | The trigger uses width `xx`≠0 |
 | C Set volume, ch1, 2, 4 | `NRx2=xx`, then `NRx4`=`$80` \| len \| period bits 10–8 (`$80` \| len on ch4) | The trigger writes `xx` to `NRx2` |
 | C Set volume, ch3 | `NR32`=(`x` & 3) << 5 | The trigger writes (`x` & 3) << 5 to `NR32` |
+| E Note cut, `xx` = 0 | Same writes as C00, right away | After the trigger: the same writes as C00 |
+| E Note cut, `xx` ≥ 1 | At tick `xx` of the row: the same writes as C00. Nothing if `xx` ≥ the row's length | Same |
 | B, D, F | See [Flow control](#flow-control) | Same |
 
 Further rules:
 
 - **9 and C last one note.** Their values are not remembered: the next trigger takes the instrument's values again.
 - **No-note fallbacks.** When there is no previous note, "period" and "noise value of the last note" are 0.
-- **Not specified yet:** effects 0–4, 7, A and E (all except an empty cell). The reference player rejects them (`golem::UnsupportedEffect`).
+- **Note cut (E):** the cut makes the writes of C00: ch1, 2, 4: `NRx2=$00`, then the retrigger; ch3: `NR32=$00`. The row's length is the one it started with: an F on the same row does not change it. Cuts due on the same tick are written in channel order, on non-row ticks before anything else.
+- **Not specified yet:** effects 0–4, 7 and A (all except an empty cell). The reference player rejects them (`golem::UnsupportedEffect`).
 
 ## Flow control
 
