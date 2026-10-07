@@ -1,0 +1,46 @@
+# Driver step 6: register effect cases not covered by registers.gsong. 5 and 8 written after
+# a trigger on the same row, on several channels; 9 with a note on an already loaded wave;
+# 9 on channel 4 before any note; C with a note on channels 3 and 4; the instrument's values
+# coming back on the next trigger. The loop replays row 00 with the previous notes set.
+ticks_per_row 04
+
+pulse 1 00 80 F3
+pulse 2 80 40 A7            # length enabled
+wave_instrument 1 00 20     # 100%, wave 0
+wave_instrument 2 00 21     # 100%, wave 1
+noise 1 00 F1               # 15-bit LFSR
+noise 2 80 B2               # 7-bit LFSR
+wave 0 0123456789ABCDEFFEDCBA9876543210
+wave 1 FFFFFFFFFFFFFFFF0000000000000000
+wave 2 02468ACEFFFFFFFFECA8642000000000
+
+order 01 02 03 04
+
+pattern 01                  # channel 1
+00 C-4 1 512                # NR50 after the trigger
+04 E-4 . 8F0                # NR51 after the trigger
+08 G-4 . 9C0                # duty folded into the trigger
+0C A-4 . ...                # instrument duty again
+10 B-4 2 C30                # volume folded into the trigger
+14 C-5 . ...                # instrument volume again
+
+pattern 02                  # channel 2
+00 E-4 2 877                # NR51 after channel 2's trigger, after channel 1's NR50
+04 --- . 5FF                # NR50 without a note, after channel 1's NR51
+
+pattern 03                  # channel 3
+00 C-4 1 ...                # loads wave 0
+04 E-4 1 900                # wave 0 already loaded: plain trigger
+08 G-4 . C30                # NR32 = 25% in the trigger
+0C A-4 . ...                # instrument volume again
+10 --- . 902                # loads wave 2 and retriggers
+14 B-4 2 ...                # loads wave 1
+18 --- . 6FF                # call routine: nothing
+
+pattern 04                  # channel 4
+00 --- . 901                # NR43 with the last note's noise value (0 at the start)
+04 C-4 1 C55                # NR42 = 55 in the trigger
+08 D-4 . ...                # instrument envelope again
+0C E-4 2 900                # 15-bit LFSR in the trigger despite instrument 2
+10 F-4 . ...                # instrument's 7-bit LFSR again
+14 --- . 578                # NR50 without a note
