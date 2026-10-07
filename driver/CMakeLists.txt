@@ -5,7 +5,7 @@
 # driver's ROM section ("Golem driver") and WRAM section ("Golem state").
 set(GOLEM_DRIVER_MAX_PLAY_CYCLES 14000)
 set(GOLEM_DRIVER_MAX_ROM_BYTES 2048)
-set(GOLEM_DRIVER_MAX_WRAM_BYTES 64)
+set(GOLEM_DRIVER_MAX_WRAM_BYTES 128)
 
 find_program(RGBASM rgbasm)
 find_program(RGBLINK rgblink)
@@ -94,6 +94,7 @@ golem_driver_test(registers) # Step 6
 golem_driver_test(effects) # Step 6
 golem_driver_test(cut) # Step 8
 golem_driver_test(delay) # Step 9
+golem_driver_test(slide) # Step 10
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
 

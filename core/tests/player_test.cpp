@@ -440,7 +440,7 @@ TEST(
     Player,
     UnsupportedEffectsThrow)
 {
-    for (const char* effect : {"001", "1FF", "200", "301", "411", "A10"}) {
+    for (const char* effect : {"001", "1FF", "200", "301", "411"}) {
         Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
         player.step();
         EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
@@ -628,6 +628,112 @@ TEST(
     // The C on row 1 retriggers with the delayed note's period (A-4: high bits 6).
     const auto frames = frames_of(on_channel(2, "00 A-4 2 702\n01 --- . C80\n", "04"), 6);
     EXPECT_EQ(frames[5], (Writes {{reg::NR22, 0x80}, {reg::NR24, 0x86}}));
+}
+
+// --- Volume slide (A) ---
+
+TEST(
+    Player,
+    VolumeSlideUpOnEachNonRowTick)
+{
+    // Instrument 2 starts at volume A: C, E, then F (clamped).
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 A20\n", "04"), 6);
+    EXPECT_EQ(frames[1].size(), 4u); // The trigger only.
+    EXPECT_EQ(frames[2], (Writes {{reg::NR22, 0xC0}, {reg::NR24, 0x86}}));
+    EXPECT_EQ(frames[3], (Writes {{reg::NR22, 0xE0}, {reg::NR24, 0x86}}));
+    EXPECT_EQ(frames[4], (Writes {{reg::NR22, 0xF0}, {reg::NR24, 0x86}}));
+    EXPECT_TRUE(frames[5].empty()); // Next row: the slide is over.
+}
+
+TEST(
+    Player,
+    VolumeSlideDownStopsAtZero)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 A04\n01 --- . A04\n", "04"), 9);
+    EXPECT_EQ(frames[2], (Writes {{reg::NR22, 0x60}, {reg::NR24, 0x86}}));
+    EXPECT_EQ(frames[3], (Writes {{reg::NR22, 0x20}, {reg::NR24, 0x86}}));
+    EXPECT_EQ(frames[4], (Writes {{reg::NR22, 0x00}, {reg::NR24, 0x86}}));
+    for (std::size_t frame = 5; frame < 9; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame; // Already 0: nothing to write.
+    }
+}
+
+TEST(
+    Player,
+    VolumeSlideWritesNothingWhenClamped)
+{
+    const auto frames = frames_of(on_channel(1, "00 A-4 1 A10\n", "04"), 5); // Volume F.
+    for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    VolumeSlideZeroDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 A00\n", "04"), 5);
+    for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    VolumeSlideStartsFromTheVolumeSetByC)
+{
+    const auto frames =
+        frames_of(on_channel(2, "00 A-4 2 ...\n01 --- . C83\n02 --- . A10\n", "04"), 13);
+    EXPECT_EQ(frames[10], (Writes {{reg::NR22, 0x90}, {reg::NR24, 0x86}}));
+    EXPECT_EQ(frames[11], (Writes {{reg::NR22, 0xA0}, {reg::NR24, 0x86}}));
+    EXPECT_EQ(frames[12], (Writes {{reg::NR22, 0xB0}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    VolumeSlideStartsFromAFoldedC)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 C30\n01 --- . A10\n", "04"), 7);
+    EXPECT_EQ(frames[6], (Writes {{reg::NR22, 0x40}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    VolumeSlideAfterACutStartsFromZero)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-4 2 E01\n01 --- . A20\n", "04"), 7);
+    EXPECT_EQ(frames[6], (Writes {{reg::NR22, 0x20}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    VolumeSlideOnTheNoiseChannel)
+{
+    // Noise instrument 2 starts at volume 7.
+    const auto frames = frames_of(on_channel(4, "00 A-4 2 A10\n", "04"), 3);
+    EXPECT_EQ(frames[2], (Writes {{reg::NR42, 0x80}, {reg::NR44, 0x80}}));
+}
+
+TEST(
+    Player,
+    VolumeSlideIsIgnoredOnTheWaveChannel)
+{
+    const auto frames = frames_of(on_channel(3, "00 A-4 1 A20\n", "04"), 5);
+    for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    VolumeSlidesAreWrittenInChannelOrder)
+{
+    const auto song =
+        make_song("ticks_per_row 04\norder 01 01 00 00\npattern 00\npattern 01\n00 A-4 2 A10\n");
+    const auto frames = render(song, 3);
+    EXPECT_EQ(
+        frames[2],
+        (Writes {{reg::NR12, 0xB0}, {reg::NR14, 0x86}, {reg::NR22, 0xB0}, {reg::NR24, 0x86}}));
 }
 
 // --- Flow control ---
