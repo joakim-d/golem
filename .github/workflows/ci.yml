@@ -1,0 +1,79 @@
+# Build, test (unit, golden and driver trace tests) and format check on every PR and on main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  RGBDS_VERSION: v1.0.4
+  CLANG_FORMAT_VERSION: 23.1.3
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.config }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [debug, release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja, clang-format and RGBDS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          pipx install "clang-format==${CLANG_FORMAT_VERSION}"
+          # Searched before PATH by find_program(), so the pinned clang-format wins.
+          echo "CMAKE_PROGRAM_PATH=$(pipx environment --value PIPX_BIN_DIR)" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/rgbds"
+          curl -sSL "https://github.com/gbdev/rgbds/releases/download/${RGBDS_VERSION}/rgbds-linux-x86_64.tar.xz" \
+            | tar xJ -C "$RUNNER_TEMP/rgbds"
+          echo "$RUNNER_TEMP/rgbds" >> "$GITHUB_PATH"
+
+      - name: Build and test
+        run: cmake --workflow --preset linux-${{ matrix.config }}
+
+      - name: Format check
+        if: matrix.config == 'debug'
+        run: cmake --build --preset linux-debug --target format-check
+
+  macos:
+    name: macOS (debug)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja and RGBDS
+        run: |
+          brew install ninja
+          curl -sSL -o "$RUNNER_TEMP/rgbds.zip" \
+            "https://github.com/gbdev/rgbds/releases/download/${RGBDS_VERSION}/rgbds-macos.zip"
+          unzip -q "$RUNNER_TEMP/rgbds.zip" -d "$RUNNER_TEMP/rgbds"
+          dirname "$(find "$RUNNER_TEMP/rgbds" -name rgbasm -type f | head -n 1)" >> "$GITHUB_PATH"
+
+      - name: Build and test
+        run: cmake --workflow --preset macos-debug
+
+  windows:
+    name: Windows (debug)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install RGBDS
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "rgbds.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "rgbds"
+          Invoke-WebRequest -Uri "https://github.com/gbdev/rgbds/releases/download/$env:RGBDS_VERSION/rgbds-win64.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $dir
+          (Get-ChildItem $dir -Recurse -Filter rgbasm.exe | Select-Object -First 1).DirectoryName | Add-Content $env:GITHUB_PATH
+
+      - name: Build and test
+        run: cmake --workflow --preset windows-debug
