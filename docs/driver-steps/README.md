@@ -17,6 +17,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [10](10-volume-slide.md) | Volume slide (A), the first continuous effect | `driver.slide` | Done |
 | [11](11-optimize.md) | Faster row tick: pointer caches, empty-cell fast path | Every `driver.*` trace unchanged, lower cycles | Done |
 | [12](12-arpeggio.md) | Arpeggio (0), the first pitch effect | `driver.arpeggio` | Done |
+| [13](13-portamento.md) | Portamento up and down (1, 2) | `driver.portamento` | Done |
 
 ## Rules for every step
 
@@ -29,5 +30,5 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 
 These effects are not specified yet. For each one, the contract, the reference player and a golden trace come first, then the driver step:
 
-- 1, 2, 3 (portamento up, down, and tone portamento)
+- 3 (tone portamento)
 - 4 (vibrato)

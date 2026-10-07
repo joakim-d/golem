@@ -81,8 +81,10 @@ Effects fall into three groups by when they act. This refines "Effects run on ev
 
 | Effect | Without a note on the row | With a note on the row |
 |---|---|---|
-| 0 Arpeggio `xy`, ch1–3 | On each non-row tick `t` of the row: the channel's last note, + `x` if `t` % 3 = 1, + `y` if `t` % 3 = 2 (clamped to B-7). If the period changed: `NRx3` = period low, `NRx4` = len \| period bits 10–8 (no trigger bit). Nothing before the channel's first note | Same, after the trigger |
+| 0 Arpeggio `xy`, ch1–3 | On each non-row tick `t` of the row: the channel's period if `t` % 3 = 0, the last note + `x` if `t` % 3 = 1, + `y` if `t` % 3 = 2 (clamped to B-7). If the period changed: `NRx3` = period low, `NRx4` = len \| period bits 10–8 (no trigger bit). Nothing before the channel's first note | Same, after the trigger |
 | 0 Arpeggio, ch4 | Nothing | Nothing |
+| 1 / 2 Portamento up / down `xx`, ch1–3 | On each non-row tick of the row: the channel's period + `xx` (1) or − `xx` (2), clamped to the note table (44 = C-2 to 2015 = B-7). The new period stays the channel's period. If it changed: `NRx3`, `NRx4` as for the arpeggio. Nothing before the channel's first note | Same, after the trigger |
+| 1 / 2 Portamento, ch4 | Nothing | Nothing |
 | 5 Set master volume | `NR50=xx` | After the trigger: `NR50=xx` |
 | 6 Call routine | Nothing | Nothing |
 | 7 Note delay, `xx` = 0 | Nothing | An ordinary trigger |
@@ -107,8 +109,8 @@ Further rules:
 - **Note delay (7):** the instrument column still applies on the row tick (it makes no writes). The delayed trigger sets the channel's period and noise value at the tick it happens. Delayed triggers and cuts due on the same tick are written in channel order (a channel has at most one, since a cell holds a single effect). A pending delay or cut never outlives its row.
 - **Volume (A):** each of channels 1, 2 and 4 tracks a volume (0–15). It starts at 0. A trigger sets it to the high nibble of the `NRx2` value it writes (the instrument's, or C's when folded). C without a note and E set it to `x` (0 for E). A slide step that leaves it unchanged (already at 0 or 15, or `A00`) writes nothing.
 - **Non-row tick order:** each channel in order makes its due timed effect (E, 7) or its slide step (A); a cell holds a single effect, so a channel has at most one.
-- **Pitch (0):** each of channels 1–3 tracks the period in its `NRx3`/`NRx4` (the pitch). A trigger sets it to the note's period; an arpeggio step changes it. On every row tick, before the channel's cell, if the pitch is not the last note's period and the cell does not trigger a note on this tick (no note, or a note delayed by 7), the driver writes the last note's period back: `NRx3`, `NRx4` = len \| period bits 10–8, no trigger bit. So C, 9 or E on the next row retrigger at the note's pitch.
-- **Not specified yet:** effects 1–4. The reference player rejects them (`golem::UnsupportedEffect`).
+- **Period and pitch (0, 1, 2):** each of channels 1–3 has a period (the last note's, or where a portamento moved it; a new note resets it) and a pitch, the period in its `NRx3`/`NRx4`. A trigger sets both; a portamento step moves both; an arpeggio step only moves the pitch. On every row tick, before the channel's cell, if the pitch is not the period and the cell does not trigger a note on this tick (no note, or a note delayed by 7), the driver writes the period back: `NRx3`, `NRx4` = len \| period bits 10–8, no trigger bit. Retriggers (C, A, E, 9 on the wave channel) use the period's high bits, so they play at the period.
+- **Not specified yet:** effects 3 and 4. The reference player rejects them (`golem::UnsupportedEffect`).
 
 ## Flow control
 

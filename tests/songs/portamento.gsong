@@ -1,0 +1,34 @@
+# Portamento (1 up, 2 down): on each non-row tick, the channel's period +/- xx, clamped to
+# the note table (C-2 = 44 to B-7 = 2015); the slid period stays the channel's period (no
+# restore; retriggers and the arpeggio's base step use it) until a new note. Nothing before
+# the first note, nothing for 00, nothing on the noise channel.
+ticks_per_row 04
+
+pulse 1 00 80 F3
+pulse 2 80 40 A7            # length enabled
+wave_instrument 1 00 A0     # length enabled, 100%, wave 0
+noise 1 00 F1
+wave 0 0123456789ABCDEFFEDCBA9876543210
+
+order 01 02 03 04
+
+pattern 01                  # channel 1
+00 C-4 2 108                # + 8 per tick
+01 --- . 108                # continues from the slid period
+02 --- . ...                # stays: no restore
+03 --- . C80                # retrigger at the slid period
+04 C-4 . 204                # a new note resets the period; - 4 per tick
+05 --- . 047                # arpeggio: + 4, + 7 from C-4, base step at the slid period
+08 A-7 . 1FF                # clamps at B-7, then nothing
+0C C-2 . 2FF                # already C-2: nothing
+10 E-4 . 100                # 00: nothing
+
+pattern 02                  # channel 2
+00 --- . 110                # no note yet: nothing
+04 G-4 1 120                # slides on the same ticks as channel 1
+
+pattern 03                  # channel 3
+00 C-4 1 210                # wave channel: NR33/NR34
+
+pattern 04                  # channel 4
+00 C-4 1 110                # ignored on noise

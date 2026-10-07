@@ -42,6 +42,7 @@ private:
         std::uint8_t note = 0; // Last note triggered (channels 1-3), 0 if none yet.
         std::uint16_t pitch = 0; // Period in NRx3/NRx4: `period`, or an arpeggio step.
         std::optional<std::uint8_t> arpeggio; // Parameter of the current row's 0.
+        std::optional<int> portamento; // Period change per tick of the row's 1 (+) or 2 (-).
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
@@ -71,14 +72,17 @@ private:
     // One non-row tick of A: volume up by x (or down by y), clamped to 0-15; on a change,
     // NRx2 = volume << 4 and a retrigger.
     void slide_volume(std::size_t channel);
-    // One non-row tick of 0 xy: the last note, + x or + y for tick % 3 = 0, 1, 2 (clamped to
-    // B-7); writes NRx3/NRx4 without retrigger when the pitch changes.
+    // One non-row tick of 0 xy: the channel's period for tick % 3 = 0, the last note + x or
+    // + y (clamped to B-7) for 1 and 2; writes NRx3/NRx4 without retrigger on a change.
     void arpeggio_step(std::size_t channel);
     // Row tick: puts the pitch back to the last note's period (NRx3/NRx4, no retrigger),
     // unless the cell triggers a note on this tick.
     void restore_pitch(
         std::size_t channel,
         const Cell& cell);
+    // One non-row tick of 1 or 2: the channel's period moves by the step, clamped to the
+    // note table (C-2 to B-7), and stays there; written like an arpeggio step on a change.
+    void portamento_step(std::size_t channel);
     // Writes `period` to NRx3/NRx4 of channel 1-3 without the trigger bit.
     void write_pitch(
         std::size_t channel,
