@@ -48,6 +48,12 @@ Out:
 |---|---|
 | `GolemPlay` (every call of every driver test) | 14000 cycles, about 20% of a frame |
 | ROM | 2048 bytes |
-| WRAM | 64 bytes |
+| WRAM | 128 bytes (64 until step 10) |
 
 **Raising a limit** is a deliberate change: update it here and in `driver/CMakeLists.txt` in the same PR, with the reason.
+
+### Changes
+
+| Step | Budget | From → to | Reason |
+|---|---|---|---|
+| 10 (volume slide) | WRAM | 64 → 128 bytes | The timed effects (steps 08–09) brought the driver to 45 bytes, and the continuous effects need per-channel state: A adds a volume and a slide per channel (53 bytes); arpeggio, portamento and vibrato will need more. |

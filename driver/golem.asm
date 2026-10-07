@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 9, all channels, flow, register and timed effects).
+; Current scope: docs/driver-steps/ (step 10, all channels, flow, register, timed effects, A).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -21,6 +21,7 @@ DEF EFFECT_SET_MASTER_VOLUME EQU $5
 DEF EFFECT_NOTE_DELAY EQU $7
 DEF EFFECT_SET_PANNING EQU $8
 DEF EFFECT_CHANGE_TIMBRE EQU $9
+DEF EFFECT_VOLUME_SLIDE EQU $A
 DEF EFFECT_POSITION_JUMP EQU $B
 DEF EFFECT_SET_VOLUME EQU $C
 DEF EFFECT_PATTERN_BREAK EQU $D
@@ -68,11 +69,14 @@ wLoadedWave: ds 1 ; Wave in wave RAM, or NO_WAVE.
 ; Timed effects of the current row, per channel. Kept in this order (see the ASSERTs).
 wCutTicks: ds CHANNELS ; Tick of a pending E, or NO_CUT.
 wDelayTicks: ds CHANNELS ; Tick of a pending 7, or NO_DELAY.
-wDelayNotes: ds CHANNELS ; Note of that pending 7.
-wTimedPending: ds 1 ; Non-zero if any channel has a pending E or 7 in the current row.
+wSlides: ds CHANNELS ; Parameter of the row's A, or 0 (no slide, like A00).
+wDelayNotes: ds CHANNELS ; Note of a pending 7.
+wTimedPending: ds 1 ; Non-zero if any channel has a pending E, 7 or A in the current row.
+wVolumes: ds CHANNELS ; Volume (0-15) of channels 1, 2 and 4, for A.
 
 ASSERT wDelayTicks == wCutTicks + CHANNELS, "ClearTimed and PlayTimed assume this layout"
-ASSERT wDelayNotes == wDelayTicks + CHANNELS, "PlayCell and PlayTimed assume this layout"
+ASSERT wSlides == wDelayTicks + CHANNELS, "ClearTimed, PlayTimed and ApplyEffect assume this layout"
+ASSERT wDelayNotes == wSlides + CHANNELS, "PlayCell and PlayTimed assume this layout"
 
 SECTION "Golem driver", ROM0
 GolemInit::
@@ -95,6 +99,13 @@ GolemInit::
 	ld a, NO_WAVE
 	ld [wLoadedWave], a
 	call ClearTimed
+	ld hl, wVolumes
+	ld b, CHANNELS
+	xor a
+.volume
+	ld [hl+], a
+	dec b
+	jr nz, .volume
 	; Every channel starts with instrument 1, period 0 and noise value 0.
 	ld hl, wChannels
 	ld b, CHANNELS
@@ -298,6 +309,7 @@ PlayCell:
 	ld de, CHANNELS
 	add hl, de ; wDelayTicks
 	ld [hl], c
+	add hl, de ; wSlides
 	add hl, de ; wDelayNotes
 	ld [hl], b
 	ld a, 1
@@ -344,6 +356,8 @@ ApplyEffect:
 	jr z, .timbre
 	cp EFFECT_SET_VOLUME
 	jp z, SetVolume
+	cp EFFECT_VOLUME_SLIDE
+	jr z, .volumeSlide
 	cp EFFECT_NOTE_CUT
 	ret nz
 	; E: cut now (E00), or at tick xx of this row if the row is that long.
@@ -360,6 +374,19 @@ ApplyEffect:
 .pendingCut
 	call CutTickAddress
 	ld [hl], b
+	ld a, 1
+	ld [wTimedPending], a
+	ret
+.volumeSlide
+	; A: a slide step on each non-row tick of this row. Nothing on the wave channel.
+	ld a, [wChannel]
+	cp WAVE_CHANNEL
+	ret z
+	call CutTickAddress
+	ld de, 2 * CHANNELS
+	add hl, de ; wSlides
+	ld a, [wParam]
+	ld [hl], a
 	ld a, 1
 	ld [wTimedPending], a
 	ret
@@ -394,8 +421,8 @@ SetVolume:
 	jp z, NoiseSetVolume
 	jp PulseSetVolume
 
-; Writes the cuts (E) and delayed triggers (7) due at tick wTick, in channel order
-; (non-row ticks). A channel has at most one: a cell holds a single effect.
+; Writes the cuts (E), delayed triggers (7) and slide steps (A) due at tick wTick, in
+; channel order (non-row ticks). A channel has at most one: a cell holds a single effect.
 PlayTimed:
 	ld a, [wTimedPending]
 	and a
@@ -414,13 +441,20 @@ PlayTimed:
 	ld de, CHANNELS
 	add hl, de ; wDelayTicks
 	cp [hl]
-	jr nz, .next
+	jr nz, .slide
 	ld [hl], NO_DELAY
+	add hl, de ; wSlides
 	add hl, de ; wDelayNotes
 	ld b, [hl]
 	xor a ; The cell's effect is 7: no 9 or C to fold.
 	ld [wOverride], a
 	call Trigger
+	jr .next
+.slide
+	add hl, de ; wSlides
+	ld a, [hl]
+	and a
+	call nz, SlideVolume
 .next
 	ld a, [wChannel]
 	inc a
@@ -428,17 +462,71 @@ PlayTimed:
 	jr nz, .channel
 	ret
 
-; Clears every pending cut and delay (row tick). Clobbers af, b, hl.
+; Clears every pending cut, delay and slide (row tick). Clobbers af, b, hl.
 ClearTimed:
 	ASSERT NO_CUT == 0 && NO_DELAY == 0
 	ld hl, wCutTicks
-	ld b, 2 * CHANNELS ; wCutTicks and wDelayTicks
+	ld b, 3 * CHANNELS ; wCutTicks, wDelayTicks and wSlides
 	xor a
 .channel
 	ld [hl+], a
 	dec b
 	jr nz, .channel
 	ld [wTimedPending], a
+	ret
+
+; One non-row tick of A on channel wChannel (1, 2 or 4): volume up by x, or down by y,
+; clamped to 0-15. If it changed: NRx2 = volume << 4 (envelope pace 0), then retrigger,
+; i.e. the writes of C without a note.
+SlideVolume:
+	call CutTickAddress
+	ld de, 2 * CHANNELS
+	add hl, de ; wSlides
+	ld b, [hl]
+	call VolumeAddress
+	ld a, b
+	swap a
+	and $0F ; x
+	jr z, .down
+	add [hl]
+	cp 16
+	jr c, .set
+	ld a, 15
+	jr .set
+.down
+	ld a, b
+	and $0F ; y
+	ld c, a
+	ld a, [hl]
+	sub c
+	jr nc, .set
+	xor a
+.set
+	cp [hl]
+	ret z ; Unchanged: nothing to write.
+	swap a
+	ld [wParam], a
+	jp SetVolume ; Stores the volume too.
+
+; In: a = an NRx2 value written for channel wChannel. Keeps its volume for A.
+; Clobbers af, hl.
+StoreVolume:
+	swap a
+	and $0F
+	push af
+	call VolumeAddress
+	pop af
+	ld [hl], a
+	ret
+
+; Out: hl = volume of channel wChannel. Clobbers af.
+VolumeAddress:
+	ld a, [wChannel]
+	add LOW(wVolumes)
+	ld l, a
+	adc HIGH(wVolumes)
+	sub l
+	ld h, a
 	ret
 
 ; Out: hl = pending cut tick of channel wChannel. Clobbers af.
@@ -457,6 +545,7 @@ PulseSetVolume:
 	inc c
 	ld a, [wParam]
 	ldh [c], a ; NRx2
+	call StoreVolume
 	inc c
 	inc c
 	call PulseNrx4
@@ -494,6 +583,7 @@ WaveTimbre:
 NoiseSetVolume:
 	ld a, [wParam]
 	ldh [rNR42], a
+	call StoreVolume
 	ld a, HDR_NOISE_INSTRUMENTS
 	call TwoByteInstrument
 	ld a, [hl]
@@ -640,6 +730,7 @@ TriggerNoise:
 	ld a, [wParam]
 .envelope
 	ldh [rNR42], a
+	call StoreVolume
 
 	; c = noise value of the note, kept for 9 without a note.
 	ld a, b
@@ -745,6 +836,7 @@ TriggerPulse:
 	ld a, [wParam]
 .nrx2
 	ldh [c], a ; NRx2
+	call StoreVolume
 	inc c
 	call ChannelState
 	inc hl ; CHANNEL_PERIOD, low byte

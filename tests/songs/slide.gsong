@@ -1,0 +1,39 @@
+# Volume slide (A): on each non-row tick, volume up by x (x != 0) or down by y, clamped to
+# 0-15; a change writes NRx2 = volume << 4 then retriggers, no change writes nothing. The
+# volume comes from the last trigger (instrument or folded C), C without a note, or E (0).
+# Ignored on the wave channel. A slide step and another channel's cut on the same tick go
+# in channel order. Row 20 sets 8 ticks per row for a long slide that clamps.
+ticks_per_row 04
+
+pulse 1 00 80 F3            # volume F
+pulse 2 80 40 A7            # volume A, length enabled
+wave_instrument 1 00 20
+noise 1 40 61               # volume 6, length enabled
+wave 0 0123456789ABCDEFFEDCBA9876543210
+
+order 01 02 03 04
+
+pattern 01                  # channel 1
+00 C-4 2 A20                # A -> C -> E -> F (clamped)
+04 --- . A10                # already F: nothing
+08 E-4 2 A04                # A -> 6 -> 2 -> 0
+0C --- . A04                # already 0: nothing
+10 G-4 2 C50                # volume 5 in the trigger
+14 --- . A10                # 6, 7, 8
+18 --- . C90                # volume 9 without a note
+1C --- . A01                # 8, 7, 6
+20 A-4 1 F08                # tempo 8 from the next row
+24 --- . A01                # F -> 8 over 7 ticks
+
+pattern 02                  # channel 2
+00 E-4 1 A00                # no change: nothing
+10 G-4 1 E01                # cut at tick 1: volume 0
+14 --- . A30                # 3, 6, 9
+
+pattern 03                  # channel 3
+00 C-4 1 A10                # ignored
+14 E-4 1 E02                # cut at tick 2, after the slide steps of channels 1 and 2
+
+pattern 04                  # channel 4
+00 C-4 1 A10                # 7, 8, 9
+08 --- . A0F                # 9 -> 0 at once, then nothing

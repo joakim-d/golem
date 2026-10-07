@@ -37,6 +37,8 @@ private:
         std::optional<unsigned> cut_tick; // Tick of the current row with a pending E.
         std::optional<unsigned> delay_tick; // Tick of the current row with a pending 7,
         std::uint8_t delay_note = 0; // and the note it triggers then.
+        std::uint8_t volume = 0; // 0-15: NRx2 volume of the last trigger, C or slide step.
+        std::optional<std::uint8_t> slide; // Parameter of the current row's A.
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
@@ -63,6 +65,9 @@ private:
         std::uint8_t param);
     // E: silences the channel like C00.
     void cut(std::size_t channel);
+    // One non-row tick of A: volume up by x (or down by y), clamped to 0-15; on a change,
+    // NRx2 = volume << 4 and a retrigger.
+    void slide_volume(std::size_t channel);
     void load_wave(std::uint8_t index);
     std::uint8_t length_enable_bit(std::size_t channel) const;
     void write(

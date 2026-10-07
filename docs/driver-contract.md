@@ -93,6 +93,8 @@ Effects fall into three groups by when they act. This refines "Effects run on ev
 | C Set volume, ch3 | `NR32`=(`x` & 3) << 5 | The trigger writes (`x` & 3) << 5 to `NR32` |
 | E Note cut, `xx` = 0 | Same writes as C00, right away | After the trigger: the same writes as C00 |
 | E Note cut, `xx` ≥ 1 | At tick `xx` of the row: the same writes as C00. Nothing if `xx` ≥ the row's length | Same |
+| A Volume slide, ch1, 2, 4 | On each non-row tick of the row: volume up by `x` if `x` ≠ 0, else down by `y`, clamped to 0–15. If it changed: `NRx2` = volume << 4 (envelope pace 0), then `NRx4` = `$80` \| len \| period bits 10–8 (`$80` \| len on ch4) | Same, after the trigger |
+| A Volume slide, ch3 | Nothing | Nothing |
 | B, D, F | See [Flow control](#flow-control) | Same |
 
 Further rules:
@@ -101,7 +103,9 @@ Further rules:
 - **No-note fallbacks.** When there is no previous note, "period" and "noise value of the last note" are 0.
 - **Note cut (E):** the cut makes the writes of C00: ch1, 2, 4: `NRx2=$00`, then the retrigger; ch3: `NR32=$00`. The row's length is the one it started with: an F on the same row does not change it. Cuts due on the same tick are written in channel order, on non-row ticks before anything else.
 - **Note delay (7):** the instrument column still applies on the row tick (it makes no writes). The delayed trigger sets the channel's period and noise value at the tick it happens. Delayed triggers and cuts due on the same tick are written in channel order (a channel has at most one, since a cell holds a single effect). A pending delay or cut never outlives its row.
-- **Not specified yet:** effects 0–4 and A (all except an empty cell). The reference player rejects them (`golem::UnsupportedEffect`).
+- **Volume (A):** each of channels 1, 2 and 4 tracks a volume (0–15). It starts at 0. A trigger sets it to the high nibble of the `NRx2` value it writes (the instrument's, or C's when folded). C without a note and E set it to `x` (0 for E). A slide step that leaves it unchanged (already at 0 or 15, or `A00`) writes nothing.
+- **Non-row tick order:** each channel in order makes its due timed effect (E, 7) or its slide step (A); a cell holds a single effect, so a channel has at most one.
+- **Not specified yet:** effects 0–4 (all except an empty cell). The reference player rejects them (`golem::UnsupportedEffect`).
 
 ## Flow control
 

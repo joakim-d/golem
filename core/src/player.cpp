@@ -2,6 +2,8 @@
 
 #include "golem/notes.h"
 
+#include <algorithm>
+
 #include <string>
 
 namespace golem {
@@ -20,6 +22,7 @@ namespace {
         kSetPanning = 0x8,
         kChangeTimbre = 0x9,
         kPositionJump = 0xB,
+        kVolumeSlide = 0xA,
         kSetVolume = 0xC,
         kPatternBreak = 0xD,
         kNoteCut = 0xE,
@@ -50,6 +53,7 @@ namespace {
         case kSetPanning:
         case kChangeTimbre:
         case kPositionJump:
+        case kVolumeSlide:
         case kSetVolume:
         case kPatternBreak:
         case kNoteCut:
@@ -102,11 +106,12 @@ std::vector<ApuWrite> Player::step()
             for (auto& channel : channels_) {
                 channel.cut_tick.reset();
                 channel.delay_tick.reset();
+                channel.slide.reset();
             }
             play_row();
         } else {
-            // Timed effects due on this tick (E, 7), in channel order. A channel has at
-            // most one: a cell holds a single effect.
+            // Timed effects due on this tick (E, 7) and slide steps (A), in channel order.
+            // A channel has at most one: a cell holds a single effect.
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
                 Channel& state = channels_[channel];
                 if (state.cut_tick == tick_) {
@@ -115,6 +120,8 @@ std::vector<ApuWrite> Player::step()
                 } else if (state.delay_tick == tick_) {
                     state.delay_tick.reset();
                     trigger(channel, state.delay_note, {});
+                } else if (state.slide) {
+                    slide_volume(channel);
                 }
             }
         }
@@ -219,7 +226,9 @@ void Player::trigger(
             write(reg::NR10, pulse.nr10());
         }
         write(base + 1, overrides.timbre.value_or(pulse.nrx1()));
-        write(base + 2, overrides.volume.value_or(pulse.nrx2()));
+        const std::uint8_t nrx2 = overrides.volume.value_or(pulse.nrx2());
+        state.volume = nrx2 >> 4;
+        write(base + 2, nrx2);
         write(base + 3, low(state.period));
         write(base + 4, kTrigger | length | high(state.period));
     } else if (channel == kWave) {
@@ -236,7 +245,9 @@ void Player::trigger(
         const bool short_lfsr = overrides.timbre ? *overrides.timbre != 0 : noise.short_lfsr();
         state.noise = noise_nr43(note);
         write(reg::NR41, noise.nr41());
-        write(reg::NR42, overrides.volume.value_or(noise.nr42()));
+        const std::uint8_t nr42 = overrides.volume.value_or(noise.nr42());
+        state.volume = nr42 >> 4;
+        write(reg::NR42, nr42);
         write(reg::NR43, state.noise | (short_lfsr ? kNoiseShortLfsr : 0));
         write(reg::NR44, kTrigger | length);
     }
@@ -272,6 +283,11 @@ void Player::apply_effect(
     case kSetVolume:
         set_volume(channel, cell.param);
         break;
+    case kVolumeSlide:
+        if (channel != kWave) { // A has no effect on the wave channel.
+            channels_[channel].slide = cell.param;
+        }
+        break;
     case kNoteCut:
         if (cell.param == 0) {
             cut(channel);
@@ -297,8 +313,9 @@ void Player::set_volume(
     std::size_t channel,
     std::uint8_t param)
 {
-    const Channel& state = channels_[channel];
+    Channel& state = channels_[channel];
     const std::uint8_t length = length_enable_bit(channel);
+    state.volume = param >> 4;
     if (channel == kPulse1 || channel == kPulse2) {
         write(pulse_base(channel) + 2, param);
         write(pulse_base(channel) + 4, kTrigger | length | high(state.period));
@@ -313,6 +330,28 @@ void Player::set_volume(
 void Player::cut(std::size_t channel)
 {
     set_volume(channel, 0x00);
+}
+
+void Player::slide_volume(std::size_t channel)
+{
+    Channel& state = channels_[channel];
+    const unsigned up = *state.slide >> 4;
+    const unsigned down = *state.slide & 0x0F;
+    const unsigned volume = up != 0 ? std::min(state.volume + up, 15u)
+                                    : (state.volume > down ? state.volume - down : 0u);
+    if (volume == state.volume) {
+        return;
+    }
+    state.volume = static_cast<std::uint8_t>(volume);
+    const std::uint8_t length = length_enable_bit(channel);
+    const auto nrx2 = static_cast<std::uint8_t>(volume << 4); // Envelope pace 0.
+    if (channel == kPulse1 || channel == kPulse2) {
+        write(pulse_base(channel) + 2, nrx2);
+        write(pulse_base(channel) + 4, kTrigger | length | high(state.period));
+    } else {
+        write(reg::NR42, nrx2);
+        write(reg::NR44, kTrigger | length);
+    }
 }
 
 void Player::load_wave(std::uint8_t index)

@@ -14,6 +14,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [07](07-budgets.md) | Cycle and size budgets enforced by the tests | Cycle limit in every `driver.*` test, `driver.size` | Done |
 | [08](08-note-cut.md) | Note cut (E), the first timed effect | `driver.cut` | Done |
 | [09](09-note-delay.md) | Note delay (7), the second timed effect | `driver.delay` | Done |
+| [10](10-volume-slide.md) | Volume slide (A), the first continuous effect | `driver.slide` | Done |
 
 ## Rules for every step
 
@@ -29,4 +30,3 @@ These effects are not specified yet. For each one, the contract, the reference p
 - 0 (arpeggio)
 - 1, 2, 3 (portamento up, down, and tone portamento)
 - 4 (vibrato)
-- A (volume slide)
