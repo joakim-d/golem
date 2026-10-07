@@ -440,7 +440,7 @@ TEST(
     Player,
     UnsupportedEffectsThrow)
 {
-    for (const char* effect : {"1FF", "200", "301", "411"}) {
+    for (const char* effect : {"301", "411"}) {
         Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
         player.step();
         EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
@@ -861,6 +861,127 @@ TEST(
     ArpeggioIsIgnoredOnTheNoiseChannel)
 {
     const auto frames = frames_of(on_channel(4, "00 C-4 1 047\n", "04"), 5);
+    for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+// --- Portamento (1, 2) ---
+
+namespace {
+
+// NRx3/NRx4 writes (no trigger bit) that set `period`.
+Writes period_writes(
+    std::uint16_t nrx3,
+    std::uint16_t nrx4,
+    std::uint16_t period,
+    std::uint8_t length = 0)
+{
+    return {
+        {nrx3, static_cast<std::uint8_t>(period & 0xFF)},
+        {nrx4, static_cast<std::uint8_t>(length | period >> 8)}};
+}
+
+const std::uint16_t kC4Period = 1547; // note_period(C-4)
+
+} // namespace
+
+TEST(
+    Player,
+    PortamentoUpAddsToThePeriodOnEachNonRowTick)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 102\n", "04"), 6);
+    EXPECT_EQ(frames[2], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_EQ(frames[3], period_writes(reg::NR23, reg::NR24, kC4Period + 4));
+    EXPECT_EQ(frames[4], period_writes(reg::NR23, reg::NR24, kC4Period + 6));
+    EXPECT_TRUE(frames[5].empty()); // The slid period stays: no restore.
+}
+
+TEST(
+    Player,
+    PortamentoDownSubtractsFromThePeriod)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 2FF\n", "03"), 4);
+    EXPECT_EQ(frames[2], period_writes(reg::NR23, reg::NR24, kC4Period - 255));
+    EXPECT_EQ(frames[3], period_writes(reg::NR23, reg::NR24, kC4Period - 510));
+}
+
+TEST(
+    Player,
+    PortamentoClampsToTheNoteTable)
+{
+    // A-7 = 2011 goes up to B-7 = 2015 and stops; C-2 = 44 cannot go down.
+    auto frames = frames_of(on_channel(2, "00 A-7 2 10A\n", "04"), 5);
+    EXPECT_EQ(frames[2], period_writes(reg::NR23, reg::NR24, 2015));
+    EXPECT_TRUE(frames[3].empty());
+    frames = frames_of(on_channel(2, "00 C-2 2 201\n", "04"), 5);
+    EXPECT_TRUE(frames[2].empty());
+}
+
+TEST(
+    Player,
+    PortamentoZeroDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 100\n", "04"), 5);
+    for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    PortamentoContinuesOnTheSlidPeriod)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 101\n01 --- . 101\n", "03"), 7);
+    EXPECT_EQ(frames[5], period_writes(reg::NR23, reg::NR24, kC4Period + 3));
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 4));
+}
+
+TEST(
+    Player,
+    RetriggersUseTheSlidPeriod)
+{
+    // C-4 + 255, then + 255 again would pass B-7: clamped to 2015 ($7DF), high bits 7.
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 1FF\n01 --- . C80\n", "04"), 6);
+    EXPECT_EQ(frames[5], (Writes {{reg::NR22, 0x80}, {reg::NR24, 0x87}}));
+}
+
+TEST(
+    Player,
+    ANewNoteResetsTheSlide)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 1FF\n01 C-4 . ...\n", "03"), 5);
+    EXPECT_EQ(
+        frames[4],
+        (Writes {{reg::NR21, 0xC0}, {reg::NR22, 0xA2}, {reg::NR23, 0x0B}, {reg::NR24, 0x86}}));
+}
+
+TEST(
+    Player,
+    ArpeggioOnASlidChannelUsesTheSlidPeriodForItsBaseStep)
+{
+    // Row 0 slides C-4 up by 1 on its 3 non-row ticks; row 1's arpeggio: + x, + y from the note,
+    // then the slid period on tick 3; row 2's tick has nothing to restore.
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 101\n01 --- . 047\n", "04"), 10);
+    EXPECT_EQ(frames[6], pitch(reg::NR23, reg::NR24, "E-4"));
+    EXPECT_EQ(frames[7], pitch(reg::NR23, reg::NR24, "G-4"));
+    EXPECT_EQ(frames[8], period_writes(reg::NR23, reg::NR24, kC4Period + 3));
+    EXPECT_TRUE(frames[9].empty()); // Already the slid period.
+}
+
+TEST(
+    Player,
+    PortamentoOnTheWaveChannel)
+{
+    const auto frames = frames_of(on_channel(3, "00 C-4 1 210\n", "04"), 3);
+    EXPECT_EQ(frames[2], period_writes(reg::NR33, reg::NR34, kC4Period - 16, 0x40));
+}
+
+TEST(
+    Player,
+    PortamentoIsIgnoredOnTheNoiseChannel)
+{
+    const auto frames = frames_of(on_channel(4, "00 C-4 1 110\n", "04"), 5);
     for (std::size_t frame = 2; frame < 5; ++frame) {
         EXPECT_TRUE(frames[frame].empty()) << frame;
     }

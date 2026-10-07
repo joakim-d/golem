@@ -17,6 +17,8 @@ namespace {
 
     enum Effect : std::uint8_t {
         kArpeggio = 0x0,
+        kPortamentoUp = 0x1,
+        kPortamentoDown = 0x2,
         kSetMasterVolume = 0x5,
         kCallRoutine = 0x6,
         kNoteDelay = 0x7,
@@ -49,6 +51,8 @@ namespace {
     {
         switch (effect) {
         case kArpeggio:
+        case kPortamentoUp:
+        case kPortamentoDown:
         case kSetMasterVolume:
         case kCallRoutine:
         case kNoteDelay:
@@ -110,11 +114,12 @@ std::vector<ApuWrite> Player::step()
                 channel.delay_tick.reset();
                 channel.slide.reset();
                 channel.arpeggio.reset();
+                channel.portamento.reset();
             }
             play_row();
         } else {
-            // Timed effects due on this tick (E, 7), slide steps (A) and arpeggio steps
-            // (0), in channel order.
+            // Timed effects due on this tick (E, 7), slide steps (A), arpeggio steps (0)
+            // and portamento steps (1, 2), in channel order.
             // A channel has at most one: a cell holds a single effect.
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
                 Channel& state = channels_[channel];
@@ -128,6 +133,8 @@ std::vector<ApuWrite> Player::step()
                     slide_volume(channel);
                 } else if (state.arpeggio) {
                     arpeggio_step(channel);
+                } else if (state.portamento) {
+                    portamento_step(channel);
                 }
             }
         }
@@ -299,6 +306,13 @@ void Player::apply_effect(
             channels_[channel].arpeggio = cell.param;
         }
         break;
+    case kPortamentoUp:
+    case kPortamentoDown:
+        if (channel != kNoise) { // 1 and 2 have no effect on the noise channel.
+            channels_[channel].portamento =
+                cell.effect == kPortamentoUp ? int {cell.param} : -int {cell.param};
+        }
+        break;
     case kVolumeSlide:
         if (channel != kWave) { // A has no effect on the wave channel.
             channels_[channel].slide = cell.param;
@@ -377,13 +391,29 @@ void Player::arpeggio_step(std::size_t channel)
         return;
     }
     const unsigned step = tick_ % 3;
-    const unsigned offset = step == 0 ? 0u
-                          : step == 1 ? *state.arpeggio >> 4
-                                      : *state.arpeggio & 0x0F;
-    const auto note =
-        static_cast<std::uint8_t>(std::min(state.note + offset, unsigned {kLastNote}));
-    const std::uint16_t period = note_period(note);
+    std::uint16_t period = state.period; // The base step: the channel's (maybe slid) period.
+    if (step != 0) {
+        const unsigned offset = step == 1 ? *state.arpeggio >> 4 : *state.arpeggio & 0x0F;
+        period = note_period(
+            static_cast<std::uint8_t>(std::min(state.note + offset, unsigned {kLastNote})));
+    }
     if (period != state.pitch) {
+        write_pitch(channel, period);
+    }
+}
+
+void Player::portamento_step(std::size_t channel)
+{
+    Channel& state = channels_[channel];
+    if (state.note == kNoteNone) {
+        return;
+    }
+    const int lowest = note_period(kFirstNote);
+    const int highest = note_period(kLastNote);
+    const auto period = static_cast<std::uint16_t>(
+        std::clamp(int {state.period} + *state.portamento, lowest, highest));
+    if (period != state.period) {
+        state.period = period;
         write_pitch(channel, period);
     }
 }
