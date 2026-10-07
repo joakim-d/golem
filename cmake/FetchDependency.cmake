@@ -11,7 +11,8 @@
 # its option() switches get overridden. When FIND_PACKAGE_ARGS is given, an installed
 # package is tried first via find_package(<name> <args>) before downloading (see
 # FETCHCONTENT_TRY_FIND_PACKAGE_MODE). Dependencies are added as SYSTEM so their
-# headers do not trigger warnings in our targets.
+# headers do not trigger warnings in our targets. <name>_SOURCE_DIR and <name>_BINARY_DIR
+# (lowercase name) are set in the caller's scope.
 
 include_guard(GLOBAL)
 
@@ -65,4 +66,9 @@ function(golem_fetch_dependency name)
 
   FetchContent_Declare(${name} ${declare_args} SYSTEM)
   FetchContent_MakeAvailable(${name})
+
+  # A dependency without a CMakeLists.txt is only downloaded: hand its location to the caller.
+  string(TOLOWER "${name}" lower_name)
+  set(${lower_name}_SOURCE_DIR "${${lower_name}_SOURCE_DIR}" PARENT_SCOPE)
+  set(${lower_name}_BINARY_DIR "${${lower_name}_BINARY_DIR}" PARENT_SCOPE)
 endfunction()
