@@ -11,7 +11,7 @@ This project allows a user to compose chiptune for the GameBoy system.
 
 ## Commands
 
-Requires CMake >= 3.25, a C++17 compiler, clang-format, and [RGBDS](https://rgbds.gbdev.io) (`rgbasm`, `rgblink`, `rgbfix` on `PATH`; without it the driver ROMs and tests are skipped with a warning). Linux and macOS presets use Ninja; Windows presets use Visual Studio 2022 (MSVC). Presets: `<os>-debug` / `<os>-release` with `<os>` in `linux`, `macos`, `windows`. Build output goes to `build/<preset>/`.
+Requires CMake >= 3.25, a C++17 compiler, clang-format, and [RGBDS](https://rgbds.gbdev.io) (`rgbasm`, `rgblink`, `rgbfix` on `PATH`; without it the driver ROMs and tests are skipped with a warning). All presets use Ninja; Windows presets compile with MSVC (`cl`), so run them from a Developer PowerShell or Developer Command Prompt (any Visual Studio version), or open the folder in Visual Studio. Presets: `<os>-debug` / `<os>-release` with `<os>` in `linux`, `macos`, `windows`. Build output goes to `build/<preset>/`.
 
 - Configure + build + test: `cmake --workflow --preset linux-debug`
 - Configure: `cmake --preset linux-debug`

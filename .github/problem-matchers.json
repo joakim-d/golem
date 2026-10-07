@@ -1,0 +1,83 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "golem-gcc-clang",
+      "pattern": [
+        {
+          "regexp": "^(.+?):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      ]
+    },
+    {
+      "owner": "golem-msvc",
+      "pattern": [
+        {
+          "regexp": "^(?:\\s*\\d+>)?([^\\s].*?)\\((\\d+)(?:,(\\d+))?\\)\\s*:\\s+(?:fatal\\s+)?(error|warning)\\s+(\\w+\\d+)\\s*:\\s*(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      ]
+    },
+    {
+      "owner": "golem-cmake",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(CMake Error.*)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "golem-rgbds",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(error: .*)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "golem-ctest",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^\\s*\\d+/\\d+ (Test\\s+#\\d+: \\S+ .*\\*\\*\\*.*)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "golem-trace-diff",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(frame \\d+: write #\\d+: .*|frame count: .*)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "golem-gtest",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(.+?):(\\d+): (Failure)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      ]
+    }
+  ]
+}

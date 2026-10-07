@@ -22,7 +22,10 @@ jobs:
       matrix:
         config: [debug, release]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Report build and test errors as annotations
+        run: echo "::add-matcher::.github/problem-matchers.json"
 
       - name: Install Ninja, clang-format and RGBDS
         run: |
@@ -47,7 +50,10 @@ jobs:
     name: macOS (debug)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Report build and test errors as annotations
+        run: echo "::add-matcher::.github/problem-matchers.json"
 
       - name: Install Ninja and RGBDS
         run: |
@@ -64,7 +70,15 @@ jobs:
     name: Windows (debug)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Report build and test errors as annotations
+        run: echo "::add-matcher::.github/problem-matchers.json"
+
+      - name: Set up the MSVC environment (cl.exe for the Ninja presets)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Install RGBDS
         shell: pwsh

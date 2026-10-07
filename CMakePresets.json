@@ -38,25 +38,25 @@
     {
       "name": "windows",
       "hidden": true,
-      "inherits": "base",
-      "generator": "Visual Studio 17 2022",
-      "architecture": "x64",
+      "inherits": "ninja",
+      "architecture": { "value": "x64", "strategy": "external" },
+      "cacheVariables": { "CMAKE_C_COMPILER": "cl", "CMAKE_CXX_COMPILER": "cl" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     },
     { "name": "linux-debug", "displayName": "Linux Debug", "inherits": ["linux", "debug"] },
     { "name": "linux-release", "displayName": "Linux Release", "inherits": ["linux", "release"] },
     { "name": "macos-debug", "displayName": "macOS Debug", "inherits": ["macos", "debug"] },
     { "name": "macos-release", "displayName": "macOS Release", "inherits": ["macos", "release"] },
-    { "name": "windows-debug", "displayName": "Windows Debug (MSVC)", "inherits": "windows" },
-    { "name": "windows-release", "displayName": "Windows Release (MSVC)", "inherits": "windows" }
+    { "name": "windows-debug", "displayName": "Windows Debug (MSVC)", "inherits": ["windows", "debug"] },
+    { "name": "windows-release", "displayName": "Windows Release (MSVC)", "inherits": ["windows", "release"] }
   ],
   "buildPresets": [
     { "name": "linux-debug", "configurePreset": "linux-debug" },
     { "name": "linux-release", "configurePreset": "linux-release" },
     { "name": "macos-debug", "configurePreset": "macos-debug" },
     { "name": "macos-release", "configurePreset": "macos-release" },
-    { "name": "windows-debug", "configurePreset": "windows-debug", "configuration": "Debug" },
-    { "name": "windows-release", "configurePreset": "windows-release", "configuration": "Release" }
+    { "name": "windows-debug", "configurePreset": "windows-debug" },
+    { "name": "windows-release", "configurePreset": "windows-release" }
   ],
   "testPresets": [
     {
@@ -68,8 +68,8 @@
     { "name": "linux-release", "inherits": "base", "configurePreset": "linux-release" },
     { "name": "macos-debug", "inherits": "base", "configurePreset": "macos-debug" },
     { "name": "macos-release", "inherits": "base", "configurePreset": "macos-release" },
-    { "name": "windows-debug", "inherits": "base", "configurePreset": "windows-debug", "configuration": "Debug" },
-    { "name": "windows-release", "inherits": "base", "configurePreset": "windows-release", "configuration": "Release" }
+    { "name": "windows-debug", "inherits": "base", "configurePreset": "windows-debug" },
+    { "name": "windows-release", "inherits": "base", "configurePreset": "windows-release" }
   ],
   "workflowPresets": [
     {
