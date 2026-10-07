@@ -144,7 +144,7 @@ Golden traces for the songs in `tests/songs/` are produced by the reference play
 
 ### Test harness
 
-`golem-run` produces the driver's trace by running a test ROM ([driver/test_rom.asm](../driver/test_rom.asm)) headless and logging every write to `$FF10`–`$FF3F`.
+`golem-run` produces the driver's trace by running a test ROM ([driver/test_rom.asm](../driver/test_rom.asm)) headless and logging every write to `$FF10`–`$FF3F`. It runs the ROM in Peanut-GB, and also in SameBoy, an accurate emulator, where it is built (GCC or Clang). The two emulators must give the same trace and the same cycles for every call.
 
 - **Frame markers:** the test ROM marks frames itself by writing to the unused address `$FF15`, once before `GolemInit` (frame 0) and once before each `GolemPlay` call. So trace frames match the driver's calls, whatever the emulator's timing.
 - **Ignored writes:** writes before the first marker, and the markers themselves.

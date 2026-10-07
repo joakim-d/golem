@@ -30,6 +30,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Emulator harness (`golem-run`, Peanut-GB) and driver test ROMs | Done |
 | Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Steps 0–15 done: every effect (0–F) |
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 3 KiB, WRAM ≤ 128 B) | Done |
+| Cross-check in SameBoy (identical traces and cycles) | Done |
 | Editor, WAV export | To do |
 
 ## Layout
