@@ -15,6 +15,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [08](08-note-cut.md) | Note cut (E), the first timed effect | `driver.cut` | Done |
 | [09](09-note-delay.md) | Note delay (7), the second timed effect | `driver.delay` | Done |
 | [10](10-volume-slide.md) | Volume slide (A), the first continuous effect | `driver.slide` | Done |
+| [11](11-optimize.md) | Faster row tick: pointer caches, empty-cell fast path | Every `driver.*` trace unchanged, lower cycles | Done |
 
 ## Rules for every step
 

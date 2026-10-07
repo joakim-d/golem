@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 10, all channels, flow, register, timed effects, A).
+; Current scope: docs/driver-steps/ (step 11: step 10's features, with a faster row tick).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -12,6 +12,7 @@ DEF HDR_PULSE_INSTRUMENTS EQU 11
 DEF HDR_WAVE_INSTRUMENTS EQU 13
 DEF HDR_NOISE_INSTRUMENTS EQU 15
 DEF HDR_WAVES EQU 17
+DEF HDR_CACHED_SIZE EQU HDR_WAVES + 2 - HDR_ORDER_TABLES ; Pointers kept in wHeaderCache.
 
 DEF CHANNELS EQU 4
 DEF WAVE_CHANNEL EQU 2 ; 0-based
@@ -50,7 +51,8 @@ ASSERT CHANNEL_SIZE == 4, "ChannelState and GolemInit assume 4 bytes per channel
 ASSERT CHANNEL_NOISE == 3, "TriggerNoise and NoiseTimbre assume CHANNEL_NOISE at offset 3"
 
 SECTION "Golem state", WRAM0
-wSong: ds 2
+wHeaderCache: ds HDR_CACHED_SIZE ; Song header from HDR_ORDER_TABLES on: order tables, instruments, waves.
+wPatterns: ds 2 * CHANNELS ; Pattern of each channel in the current order.
 wTicksPerRow: ds 1 ; Tempo: raw header or F value, 0 means 256.
 wRowLength: ds 1 ; Tempo when the current row started.
 wTick: ds 1
@@ -80,22 +82,32 @@ ASSERT wDelayNotes == wSlides + CHANNELS, "PlayCell and PlayTimed assume this la
 
 SECTION "Golem driver", ROM0
 GolemInit::
-	ld a, l
-	ld [wSong], a
-	ld a, h
-	ld [wSong + 1], a
-	ld a, [hl] ; HDR_TICKS_PER_ROW
+	ld a, [hl+] ; HDR_TICKS_PER_ROW
 	ld [wTicksPerRow], a
-	ld a, HDR_ORDER_COUNT
-	call SongHeaderWord
-	ld a, [hl]
+	ASSERT HDR_ORDER_COUNT == HDR_TICKS_PER_ROW + 1
+	ld a, [hl+]
+	ld e, a
+	ld a, [hl+]
+	ld d, a
+	ld a, [de]
 	ld [wOrderCount], a
+	; Keep the header's pointers in WRAM: SongHeaderWord reads them from there.
+	ASSERT HDR_ORDER_TABLES == HDR_ORDER_COUNT + 2
+	ld de, wHeaderCache
+	ld b, HDR_CACHED_SIZE
+.header
+	ld a, [hl+]
+	ld [de], a
+	inc de
+	dec b
+	jr nz, .header
 
 	xor a
 	ld [wTick], a
 	ld [wRow], a
 	ld [wOrder], a
 	ld [wFlow], a
+	call LoadPatterns
 	ld a, NO_WAVE
 	ld [wLoadedWave], a
 	call ClearTimed
@@ -174,7 +186,7 @@ GolemPlay::
 	xor a ; Past the last order: loop to order 0.
 .storeOrder
 	ld [wOrder], a
-	ret
+	jp LoadPatterns
 
 .flow
 	; B and/or D on the row that just ended. a = wFlow.
@@ -207,6 +219,37 @@ GolemPlay::
 	xor a
 .setRow
 	ld [wRow], a
+	jp LoadPatterns
+
+; Loads wPatterns from the order tables, for the order in wOrder. Clobbers all registers.
+LoadPatterns:
+	ld a, [wOrder]
+	ld c, a
+	ld b, 0
+	sla c
+	rl b ; bc = 2 * order: offset in an order table.
+	ld de, wPatterns
+	ld hl, wHeaderCache ; The order tables come first.
+	ld a, CHANNELS
+.channel
+	push af
+	push hl
+	ld a, [hl+]
+	ld h, [hl]
+	ld l, a
+	add hl, bc
+	ld a, [hl+]
+	ld [de], a
+	inc de
+	ld a, [hl]
+	ld [de], a
+	inc de
+	pop hl
+	inc hl
+	inc hl
+	pop af
+	dec a
+	jr nz, .channel
 	ret
 
 ; Plays the current row of every channel, in channel order (row tick).
@@ -224,22 +267,20 @@ PlayRow:
 ; Plays the current row of channel wChannel: instrument column, flow effects, trigger,
 ; then the effect's own writes.
 PlayCell:
-	; hl = order table of the channel, then the pattern of the current order.
+	; hl = the channel's pattern in the current order, then the cell of the current row.
 	ld a, [wChannel]
 	add a
-	add HDR_ORDER_TABLES
-	call SongHeaderWord
-	ld a, [wOrder]
-	ld e, a
-	ld d, 0
-	add hl, de
-	add hl, de
+	add LOW(wPatterns)
+	ld l, a
+	adc HIGH(wPatterns)
+	sub l
+	ld h, a
 	ld a, [hl+]
 	ld h, [hl]
 	ld l, a
-	; hl = cell of the current row (3 bytes per row).
 	ld a, [wRow]
 	ld e, a
+	ld d, 0
 	add hl, de
 	add hl, de
 	add hl, de
@@ -249,6 +290,11 @@ PlayCell:
 	ld a, [hl+]
 	ld c, a
 	ld e, [hl]
+	; An empty cell (no note, no instrument, effect 0 with $00) does nothing.
+	or b
+	or e
+	ret z
+	ld a, c
 	and $0F
 	ld [wEffect], a
 	ld a, e
@@ -652,11 +698,17 @@ TriggerWave:
 	call WaveVolumeFromParam
 .volume
 	ldh [rNR32], a
+	ld a, d
+	and $80 ; Length enable, bit 7 of instrument byte 1.
+	rrca
+	or $80
+	ld d, a ; d = NR34 without the period bits.
 	call ChannelState
 	inc hl ; CHANNEL_PERIOD
-	ld a, [hl]
+	ld a, [hl+]
 	ldh [rNR33], a
-	call WaveNr34
+	ld a, [hl]
+	or d
 	ldh [rNR34], a
 	ret
 
@@ -812,6 +864,11 @@ SetNotePeriod:
 TriggerPulse:
 	call SetNotePeriod
 	call PulseInstrument
+	ld a, [hl]
+	and $80 ; Length enable, bit 7 of instrument byte 0.
+	rrca
+	or $80
+	ld d, a ; d = NRx4 without the period bits.
 	ld a, [wChannel]
 	and a
 	jr nz, .sweepDone
@@ -839,11 +896,12 @@ TriggerPulse:
 	call StoreVolume
 	inc c
 	call ChannelState
-	inc hl ; CHANNEL_PERIOD, low byte
-	ld a, [hl]
+	inc hl ; CHANNEL_PERIOD
+	ld a, [hl+]
 	ldh [c], a ; NRx3
 	inc c
-	call PulseNrx4
+	ld a, [hl]
+	or d
 	ldh [c], a ; NRx4
 	ret
 
@@ -902,15 +960,14 @@ ChannelState:
 	ld h, a
 	ret
 
-; In: a = offset of a pointer in the song header. Out: hl = that pointer. Clobbers af, de.
+; In: a = offset of a pointer in the song header (HDR_ORDER_TABLES or later).
+; Out: hl = that pointer, read from wHeaderCache. Clobbers af (and keeps de).
 SongHeaderWord:
-	ld e, a
-	ld d, 0
-	ld a, [wSong]
+	add LOW(wHeaderCache - HDR_ORDER_TABLES)
 	ld l, a
-	ld a, [wSong + 1]
+	adc HIGH(wHeaderCache - HDR_ORDER_TABLES)
+	sub l
 	ld h, a
-	add hl, de
 	ld a, [hl+]
 	ld h, [hl]
 	ld l, a

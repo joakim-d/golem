@@ -42,6 +42,16 @@ Out:
 | ROM (`"Golem driver"`) | 1090 bytes, including 216 bytes of note tables |
 | WRAM (`"Golem state"`) | 32 bytes |
 
+**After the step 11 optimization**, with all of step 10's features:
+
+| Measure | Step 10 | Step 11 |
+|---|---|---|
+| `GolemPlay`, worst case | 11792 cycles | 9688 cycles (−18%) |
+| `GolemPlay`, mean of the songs' averages | 1084 cycles | 660 cycles (−39%) |
+| `GolemPlay`, row tick of an empty song | 3512 cycles | 1624 cycles (−54%) |
+| ROM | 1392 bytes | 1454 bytes |
+| WRAM | 53 bytes | 75 bytes (pointer caches) |
+
 **Enforced:** a target budget with room for the effects not specified yet (0–4, 7, A, E). The values are set in [driver/CMakeLists.txt](../../driver/CMakeLists.txt).
 
 | Budget | Limit |
