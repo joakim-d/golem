@@ -98,6 +98,7 @@ golem_driver_test(slide) # Step 10
 golem_driver_test(arpeggio) # Step 12
 golem_driver_test(portamento) # Step 13
 golem_driver_test(tone) # Step 14
+golem_driver_test(vibrato) # Step 15
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
 

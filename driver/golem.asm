@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 14: all channels, flow, register, timed effects, A, 0-3).
+; Current scope: docs/driver-steps/ (step 15: every effect of the song format, 0-F).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -23,6 +23,7 @@ DEF EFFECT_ARPEGGIO EQU $0
 DEF EFFECT_PORTAMENTO_UP EQU $1
 DEF EFFECT_PORTAMENTO_DOWN EQU $2
 DEF EFFECT_TONE_PORTAMENTO EQU $3
+DEF EFFECT_VIBRATO EQU $4
 DEF EFFECT_SET_MASTER_VOLUME EQU $5
 DEF EFFECT_NOTE_DELAY EQU $7
 DEF EFFECT_SET_PANNING EQU $8
@@ -80,9 +81,11 @@ wSlides: ds CHANNELS ; Parameter of the row's A, or 0 (no slide, like A00).
 wArpeggios: ds CHANNELS ; Parameter of the row's 0, or 0 (no arpeggio).
 wPortas: ds CHANNELS ; Step of the row's 1 or 2, or 0 (no portamento).
 wTonePortas: ds CHANNELS ; Step of the row's 3, or 0 (no tone portamento).
+wVibratos: ds CHANNELS ; Parameter of the row's 4, or 0 (no vibrato).
+wVibratoCounts: ds CHANNELS ; Bit 7: the - y phase; bits 0-6: its ticks left; 0: first step.
 wDelayNotes: ds CHANNELS ; Note of a pending 7.
 wPortaDown: ds CHANNELS ; Non-zero for 2 (down); read only while wPortas is set.
-wTimedPending: ds 1 ; Non-zero if any channel has a pending E, 7, A, 0, 1, 2 or 3 in the current row.
+wTimedPending: ds 1 ; Non-zero if any channel has a pending E, 7, A, 0, 1, 2, 3 or 4 in the row.
 wPhase: ds 1 ; wTick % 3, for the arpeggio.
 wPitchMoved: ds 1 ; Non-zero once an arpeggio step moved a pitch: the next row tick restores.
 ; Per channel, kept from row to row; cleared together by GolemInit.
@@ -96,6 +99,8 @@ ASSERT wSlides == wDelayTicks + CHANNELS, "ClearTimed, PlayTimed and ApplyEffect
 ASSERT wArpeggios == wSlides + CHANNELS, "ClearTimed and PlayTimed assume this layout"
 ASSERT wPortas == wArpeggios + CHANNELS, "ClearTimed and PlayTimed assume this layout"
 ASSERT wTonePortas == wPortas + CHANNELS, "ClearTimed and PlayTimed assume this layout"
+ASSERT wVibratos == wTonePortas + CHANNELS, "ClearTimed and PlayTimed assume this layout"
+ASSERT wVibratoCounts == wVibratos + CHANNELS, "ClearTimed and VibratoStep assume this layout"
 ASSERT wNotes == wVolumes + CHANNELS && wPitches == wNotes + CHANNELS, "GolemInit assumes this layout"
 ASSERT wTargets == wPitches + 2 * CHANNELS, "GolemInit assumes this layout"
 
@@ -473,6 +478,8 @@ ApplyEffect:
 	jp z, .portamento
 	cp EFFECT_TONE_PORTAMENTO
 	jp z, .tonePortamento
+	cp EFFECT_VIBRATO
+	jp z, .vibrato
 	cp EFFECT_SET_MASTER_VOLUME
 	jp z, .masterVolume
 	cp EFFECT_SET_PANNING
@@ -513,6 +520,20 @@ ApplyEffect:
 	ld [hl], a
 	and a
 	ret z ; Effect 0 with $00: no arpeggio.
+	ld a, 1
+	ld [wTimedPending], a
+	ret
+.vibrato
+	; 4: vibrato steps on the non-row ticks of this row. Nothing on the noise channel.
+	ld a, [wChannel]
+	cp NOISE_CHANNEL
+	ret z
+	ld hl, wVibratos
+	call ChannelEntry
+	ld a, [wParam]
+	ld [hl], a
+	and a
+	ret z ; 400: no vibrato.
 	ld a, 1
 	ld [wTimedPending], a
 	ret
@@ -596,8 +617,9 @@ SetVolume:
 	jp z, NoiseSetVolume
 	jp PulseSetVolume
 
-; Writes the cuts (E), delayed triggers (7), slide steps (A), arpeggio steps (0) and
-; portamento steps (1, 2, 3) due at tick wTick, in channel order (non-row ticks). A channel has at most one: a cell holds a
+; Writes the cuts (E), delayed triggers (7), slide steps (A), arpeggio steps (0),
+; portamento steps (1, 2, 3) and vibrato steps (4) due at tick wTick, in channel order
+; (non-row ticks). A channel has at most one: a cell holds a
 ; single effect.
 PlayTimed:
 	ld a, [wTimedPending]
@@ -651,7 +673,14 @@ PlayTimed:
 	add hl, de ; wTonePortas
 	ld a, [hl]
 	and a
-	call nz, TonePortaStep
+	jr z, .vibrato
+	call TonePortaStep
+	jr .next
+.vibrato
+	add hl, de ; wVibratos
+	ld a, [hl]
+	and a
+	call nz, VibratoStep
 .next
 	ld a, [wChannel]
 	inc a
@@ -659,12 +688,12 @@ PlayTimed:
 	jr nz, .channel
 	ret
 
-; Clears every pending cut, delay, slide, arpeggio, portamento and tone portamento (row tick).
+; Clears every per-row effect table, from wCutTicks to wVibratoCounts (row tick).
 ; Clobbers af, b, hl.
 ClearTimed:
 	ASSERT NO_CUT == 0 && NO_DELAY == 0
 	ld hl, wCutTicks
-	ld b, 6 * CHANNELS ; wCutTicks, wDelayTicks, wSlides, wArpeggios, wPortas, wTonePortas
+	ld b, 8 * CHANNELS ; From wCutTicks to wVibratoCounts
 	xor a
 .channel
 	ld [hl+], a
@@ -803,40 +832,10 @@ PortaStep:
 	ld a, b
 	and a
 	jr nz, .down
-	ld a, e ; Up: de + step, at most NOTE_PERIOD_LAST.
-	add c
-	ld e, a
-	jr nc, .checkHigh
-	inc d
-.checkHigh
-	ld a, d
-	cp HIGH(NOTE_PERIOD_LAST)
-	jr c, .store
-	jr nz, .clampHigh
-	ld a, e
-	cp LOW(NOTE_PERIOD_LAST) + 1
-	jr c, .store
-.clampHigh
-	ld de, NOTE_PERIOD_LAST
+	call AddPeriodClamped
 	jr .store
 .down
-	ld a, e ; Down: de - step, at least NOTE_PERIOD_FIRST.
-	sub c
-	ld e, a
-	jr nc, .checkLow
-	dec d
-.checkLow
-	bit 7, d
-	jr nz, .clampLow ; Went below 0.
-	ld a, d
-	and a
-	jr nz, .store ; At least 256.
-	ASSERT HIGH(NOTE_PERIOD_FIRST) == 0
-	ld a, e
-	cp LOW(NOTE_PERIOD_FIRST)
-	jr nc, .store
-.clampLow
-	ld de, NOTE_PERIOD_FIRST
+	call SubPeriodClamped
 .store
 	ld a, [hl+] ; hl = CHANNEL_PERIOD
 	cp e
@@ -916,9 +915,119 @@ TonePortaStep:
 	ld [hl], d
 	jp WritePitch
 
+; One non-row tick of 4 xy on channel wChannel (1-3): the channel's period + y for x
+; ticks, then - y for x ticks, and so on (x = 0 counts as 1), clamped to the note table.
+; Writes the pitch (not the period) when it changes. Clobbers all.
+VibratoStep:
+	ld hl, wNotes
+	call ChannelEntry
+	ld a, [hl]
+	and a
+	ret z ; No note yet.
+	ld hl, wVibratos
+	call ChannelEntry
+	ld c, [hl] ; c = xy
+	ld de, wVibratoCounts - wVibratos
+	add hl, de
+	ld a, [hl]
+	and a
+	jr nz, .counting
+	call VibratoSpeed ; First step of the row: + y, x ticks left.
+.counting
+	ld b, a ; b = this tick's phase (bit 7) and ticks left
+	and $7F
+	dec a
+	jr nz, .sameNext
+	call VibratoSpeed ; Phase over: the other one, x ticks.
+	ld e, a
+	ld a, b
+	and $80
+	xor $80
+	or e
+	jr .setCount
+.sameNext
+	ld e, a
+	ld a, b
+	and $80
+	or e
+.setCount
+	ld [hl], a
+	call ChannelPeriod ; de = period
+	ld a, c
+	and $0F
+	ld c, a ; c = y
+	bit 7, b
+	jr nz, .down
+	call AddPeriodClamped
+	jr .compare
+.down
+	call SubPeriodClamped
+.compare
+	ld hl, wPitches
+	call ChannelWord
+	ld a, [hl+]
+	cp e
+	jr nz, .write
+	ld a, [hl]
+	cp d
+	ret z ; Same pitch: nothing to write.
+.write
+	ld a, 1
+	ld [wPitchMoved], a
+	jp WritePitch
+
+; In: c = vibrato parameter xy. Out: a = x, or 1 if x is 0. Keeps the other registers.
+VibratoSpeed:
+	ld a, c
+	swap a
+	and $0F
+	ret nz
+	inc a
+	ret
+
+; de = min(de + c, NOTE_PERIOD_LAST). Clobbers af.
+AddPeriodClamped:
+	ld a, e
+	add c
+	ld e, a
+	jr nc, .check
+	inc d
+.check
+	ld a, d
+	cp HIGH(NOTE_PERIOD_LAST)
+	ret c
+	jr nz, .clamp
+	ld a, e
+	cp LOW(NOTE_PERIOD_LAST) + 1
+	ret c
+.clamp
+	ld de, NOTE_PERIOD_LAST
+	ret
+
+; de = max(de - c, NOTE_PERIOD_FIRST); de is at most $7FF. Clobbers af.
+SubPeriodClamped:
+	ld a, e
+	sub c
+	ld e, a
+	jr nc, .check
+	dec d
+.check
+	bit 7, d
+	jr nz, .clamp ; Went below 0.
+	ld a, d
+	and a
+	ret nz ; At least 256.
+	ASSERT HIGH(NOTE_PERIOD_FIRST) == 0
+	ld a, e
+	cp LOW(NOTE_PERIOD_FIRST)
+	ret nc
+.clamp
+	ld de, NOTE_PERIOD_FIRST
+	ret
+
 ; Row tick, before channel wChannel's cell (b = note, c = instrument << 4 | effect, e =
-; effect parameter): if an arpeggio left the pitch off the channel's period, writes the
-; period back, unless the cell triggers a note on this tick. Keeps bc and de.
+; effect parameter): if an arpeggio or a vibrato left the pitch off the channel's period,
+; writes the period back, unless the cell triggers a note on this tick. Keeps bc and de.
 RestorePitch:
 	ld a, [wChannel]
 	cp NOISE_CHANNEL

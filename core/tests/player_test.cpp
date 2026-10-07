@@ -436,17 +436,6 @@ TEST(
     EXPECT_FALSE(frames[258].empty());
 }
 
-TEST(
-    Player,
-    UnsupportedEffectsThrow)
-{
-    for (const char* effect : {"411", "4FF"}) {
-        Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
-        player.step();
-        EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
-    }
-}
-
 // --- Note cut (E) ---
 
 TEST(
@@ -1103,6 +1092,122 @@ TEST(
     const auto frames = frames_of(on_channel(4, "00 C-4 1 ...\n01 E-4 . 340\n", "04"), 9);
     EXPECT_EQ(frames[5].size(), 4u);
     for (std::size_t frame = 6; frame < 9; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+// --- Vibrato (4) ---
+
+TEST(
+    Player,
+    VibratoAlternatesAroundThePeriod)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 412\n", "06"), 8);
+    EXPECT_EQ(frames[2], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_EQ(frames[3], period_writes(reg::NR23, reg::NR24, kC4Period - 2));
+    EXPECT_EQ(frames[4], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_EQ(frames[5], period_writes(reg::NR23, reg::NR24, kC4Period - 2));
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_EQ(frames[7], period_writes(reg::NR23, reg::NR24, kC4Period)); // Restored.
+}
+
+TEST(
+    Player,
+    VibratoSwitchesEveryXTicks)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 422\n", "06"), 7);
+    EXPECT_EQ(frames[2], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_TRUE(frames[3].empty());
+    EXPECT_EQ(frames[4], period_writes(reg::NR23, reg::NR24, kC4Period - 2));
+    EXPECT_TRUE(frames[5].empty());
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+}
+
+TEST(
+    Player,
+    VibratoSpeedZeroCountsAsOne)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 402\n", "04"), 4);
+    EXPECT_EQ(frames[2], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_EQ(frames[3], period_writes(reg::NR23, reg::NR24, kC4Period - 2));
+}
+
+TEST(
+    Player,
+    VibratoDepthZeroDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 410\n", "06"), 8);
+    for (std::size_t frame = 2; frame < 8; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    VibratoClampsToTheNoteTable)
+{
+    // B-7 = 2015: + 15 clamps to 2015 (no change), - 15 gives 2000.
+    const auto frames = frames_of(on_channel(2, "00 B-7 2 41F\n", "04"), 5);
+    EXPECT_TRUE(frames[2].empty());
+    EXPECT_EQ(frames[3], period_writes(reg::NR23, reg::NR24, 2000));
+    EXPECT_EQ(frames[4], period_writes(reg::NR23, reg::NR24, 2015));
+}
+
+TEST(
+    Player,
+    VibratoBeforeAnyNoteDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 --- . 412\n", "04"), 5);
+    for (std::size_t frame = 1; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    VibratoWithoutANoteUsesTheChannelsPeriod)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 ...\n01 --- . 412\n", "04"), 8);
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 2));
+    EXPECT_EQ(frames[7], period_writes(reg::NR23, reg::NR24, kC4Period - 2));
+}
+
+TEST(
+    Player,
+    VibratoOnASlidPeriod)
+{
+    // Row 0 slides C-4 up by 4 on 3 ticks (+ 12); row 1 vibrates around that.
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 104\n01 --- . 412\n", "04"), 8);
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 12 + 2));
+    EXPECT_EQ(frames[7], period_writes(reg::NR23, reg::NR24, kC4Period + 12 - 2));
+}
+
+TEST(
+    Player,
+    VibratoIsRestoredBeforeTheNextRowsWrites)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 412\n01 --- . C80\n", "03"), 5);
+    EXPECT_EQ(
+        frames[4],
+        concat(
+            {period_writes(reg::NR23, reg::NR24, kC4Period),
+             {{reg::NR22, 0x80}, {reg::NR24, 0x86}}}));
+}
+
+TEST(
+    Player,
+    VibratoOnTheWaveChannel)
+{
+    const auto frames = frames_of(on_channel(3, "00 C-4 1 412\n", "04"), 3);
+    EXPECT_EQ(frames[2], period_writes(reg::NR33, reg::NR34, kC4Period + 2, 0x40));
+}
+
+TEST(
+    Player,
+    VibratoIsIgnoredOnTheNoiseChannel)
+{
+    const auto frames = frames_of(on_channel(4, "00 C-4 1 412\n", "04"), 5);
+    for (std::size_t frame = 2; frame < 5; ++frame) {
         EXPECT_TRUE(frames[frame].empty()) << frame;
     }
 }

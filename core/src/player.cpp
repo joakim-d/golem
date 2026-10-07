@@ -20,6 +20,7 @@ namespace {
         kPortamentoUp = 0x1,
         kPortamentoDown = 0x2,
         kTonePortamento = 0x3,
+        kVibrato = 0x4,
         kSetMasterVolume = 0x5,
         kCallRoutine = 0x6,
         kNoteDelay = 0x7,
@@ -46,30 +47,6 @@ namespace {
     bool is_empty_effect(const Cell& cell)
     {
         return cell.effect == 0 && cell.param == 0;
-    }
-
-    bool is_supported(std::uint8_t effect)
-    {
-        switch (effect) {
-        case kArpeggio:
-        case kPortamentoUp:
-        case kPortamentoDown:
-        case kTonePortamento:
-        case kSetMasterVolume:
-        case kCallRoutine:
-        case kNoteDelay:
-        case kSetPanning:
-        case kChangeTimbre:
-        case kPositionJump:
-        case kVolumeSlide:
-        case kSetVolume:
-        case kPatternBreak:
-        case kNoteCut:
-        case kSetTempo:
-            return true;
-        default:
-            return false;
-        }
     }
 
     std::uint8_t low(std::uint16_t period)
@@ -118,11 +95,12 @@ std::vector<ApuWrite> Player::step()
                 channel.arpeggio.reset();
                 channel.portamento.reset();
                 channel.tone_portamento.reset();
+                channel.vibrato.reset();
             }
             play_row();
         } else {
-            // Timed effects due on this tick (E, 7), slide steps (A), arpeggio steps (0)
-            // and portamento steps (1, 2, 3), in channel order.
+            // Timed effects due on this tick (E, 7), slide steps (A), arpeggio steps (0),
+            // portamento steps (1, 2, 3) and vibrato steps (4), in channel order.
             // A channel has at most one: a cell holds a single effect.
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
                 Channel& state = channels_[channel];
@@ -140,6 +118,8 @@ std::vector<ApuWrite> Player::step()
                     portamento_step(channel);
                 } else if (state.tone_portamento) {
                     tone_portamento_step(channel);
+                } else if (state.vibrato) {
+                    vibrato_step(channel);
                 }
             }
         }
@@ -178,18 +158,6 @@ void Player::play_row()
     for (std::size_t channel = 0; channel < kChannels; ++channel) {
         const auto& pattern = song_.patterns[song_.orders[order_][channel]];
         const Cell& cell = pattern[row_];
-        if (!is_empty_effect(cell) && !is_supported(cell.effect)) {
-            throw UnsupportedEffect(
-                "order "
-                + std::to_string(order_)
-                + " row "
-                + std::to_string(row_)
-                + " channel "
-                + std::to_string(channel + 1)
-                + ": effect "
-                + std::to_string(cell.effect)
-                + " is not implemented");
-        }
         restore_pitch(channel, cell);
         play_cell(channel, cell);
     }
@@ -323,6 +291,11 @@ void Player::apply_effect(
     case kArpeggio:
         if (channel != kNoise) { // 0 has no effect on the noise channel.
             channels_[channel].arpeggio = cell.param;
+        }
+        break;
+    case kVibrato:
+        if (channel != kNoise) { // 4 has no effect on the noise channel.
+            channels_[channel].vibrato = cell.param;
         }
         break;
     case kTonePortamento:
@@ -475,6 +448,24 @@ bool Player::triggers_on_row_tick(
         return false;
     }
     return true;
+}
+
+void Player::vibrato_step(std::size_t channel)
+{
+    const Channel& state = channels_[channel];
+    if (state.note == kNoteNone) {
+        return;
+    }
+    const unsigned speed = std::max(*state.vibrato >> 4, 1);
+    const int depth = *state.vibrato & 0x0F;
+    const bool up = ((tick_ - 1) / speed) % 2 == 0;
+    const int lowest = note_period(kFirstNote);
+    const int highest = note_period(kLastNote);
+    const auto period = static_cast<std::uint16_t>(
+        std::clamp(int {state.period} + (up ? depth : -depth), lowest, highest));
+    if (period != state.pitch) {
+        write_pitch(channel, period);
+    }
 }
 
 void Player::restore_pitch(

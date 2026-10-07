@@ -87,6 +87,8 @@ Effects fall into three groups by when they act. This refines "Effects run on ev
 | 1 / 2 Portamento, ch4 | Nothing | Nothing |
 | 3 Tone portamento `xx`, ch1–3 | On each non-row tick of the row: the channel's period moves `xx` toward its target, without passing it. The new period stays the channel's period. If it changed: `NRx3`, `NRx4` as for the arpeggio. Nothing without a target, or for `00` | No trigger (unless the channel has played no note yet: then an ordinary trigger). The note becomes the channel's last note, and its period the target. Then the same steps |
 | 3 Tone portamento, ch4 | Nothing | An ordinary trigger |
+| 4 Vibrato `xy`, ch1–3 | On each non-row tick `t` of the row: the channel's period + `y` for `t` = 1 to `x`, − `y` for the next `x` ticks, and so on (`x` = 0 counts as 1), clamped to the note table. It moves the pitch only, not the period. If the pitch changed: `NRx3`, `NRx4` as for the arpeggio. Nothing before the channel's first note | Same, after the trigger |
+| 4 Vibrato, ch4 | Nothing | Nothing |
 | 5 Set master volume | `NR50=xx` | After the trigger: `NR50=xx` |
 | 6 Call routine | Nothing | Nothing |
 | 7 Note delay, `xx` = 0 | Nothing | An ordinary trigger |
@@ -112,8 +114,8 @@ Further rules:
 - **Volume (A):** each of channels 1, 2 and 4 tracks a volume (0–15). It starts at 0. A trigger sets it to the high nibble of the `NRx2` value it writes (the instrument's, or C's when folded). C without a note and E set it to `x` (0 for E). A slide step that leaves it unchanged (already at 0 or 15, or `A00`) writes nothing.
 - **Non-row tick order:** each channel in order makes its due timed effect (E, 7) or its slide step (A); a cell holds a single effect, so a channel has at most one.
 - **Tone portamento target (3):** a channel keeps the target until its next trigger. So 3 on later rows without a note keeps sliding toward it, and once the period reaches it, further steps do nothing.
-- **Period and pitch (0, 1, 2, 3):** each of channels 1–3 has a period (the last note's, or where a portamento moved it; a new note resets it) and a pitch, the period in its `NRx3`/`NRx4`. A trigger sets both; a portamento or tone portamento step moves both; an arpeggio step only moves the pitch. On every row tick, before the channel's cell, if the pitch is not the period and the cell does not trigger a note on this tick (no note, a note delayed by 7, or a 3 target), the driver writes the period back: `NRx3`, `NRx4` = len \| period bits 10–8, no trigger bit. Retriggers (C, A, E, 9 on the wave channel) use the period's high bits, so they play at the period.
-- **Not specified yet:** effect 4. The reference player rejects them (`golem::UnsupportedEffect`).
+- **Period and pitch (0–4):** each of channels 1–3 has a period (the last note's, or where a portamento moved it; a new note resets it) and a pitch, the period in its `NRx3`/`NRx4`. A trigger sets both; a portamento or tone portamento step moves both; an arpeggio or vibrato step only moves the pitch. On every row tick, before the channel's cell, if the pitch is not the period and the cell does not trigger a note on this tick (no note, a note delayed by 7, or a 3 target), the driver writes the period back: `NRx3`, `NRx4` = len \| period bits 10–8, no trigger bit. Retriggers (C, A, E, 9 on the wave channel) use the period's high bits, so they play at the period.
+- **Every effect is specified:** 0 to F all have a defined behaviour, so the reference player accepts every valid song.
 
 ## Flow control
 
