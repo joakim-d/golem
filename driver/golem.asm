@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 2, pulse channels 1 and 2).
+; Current scope: docs/driver-steps/ (step 3, channels 1 to 3).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -9,11 +9,16 @@ DEF HDR_TICKS_PER_ROW EQU 0
 DEF HDR_ORDER_COUNT EQU 1
 DEF HDR_ORDER_TABLES EQU 3 ; One pointer per channel.
 DEF HDR_PULSE_INSTRUMENTS EQU 11
+DEF HDR_WAVE_INSTRUMENTS EQU 13
+DEF HDR_WAVES EQU 17
 
 DEF CHANNELS EQU 4
-DEF PLAYED_CHANNELS EQU 2 ; Channels the driver plays so far: 1 and 2.
+DEF PLAYED_CHANNELS EQU 3 ; Channels the driver plays so far: 1 to 3.
+DEF WAVE_CHANNEL EQU 2 ; 0-based
 DEF ROWS_PER_PATTERN EQU 64
 DEF EFFECT_SET_VOLUME EQU $C
+DEF WAVE_BYTES EQU 16
+DEF NO_WAVE EQU $FF
 
 ; Per-channel state, CHANNEL_SIZE bytes each in wChannels.
 RSRESET
@@ -32,6 +37,7 @@ wOrder: ds 1
 wOrderCount: ds 1
 wChannel: ds 1 ; Channel being played, 0-based.
 wChannels: ds CHANNEL_SIZE * CHANNELS
+wLoadedWave: ds 1 ; Wave in wave RAM, or NO_WAVE.
 
 SECTION "Golem driver", ROM0
 GolemInit::
@@ -50,6 +56,8 @@ GolemInit::
 	ld [wTick], a
 	ld [wRow], a
 	ld [wOrder], a
+	ld a, NO_WAVE
+	ld [wLoadedWave], a
 	; Every channel starts with instrument 1 and period 0.
 	ld hl, wChannels
 	ld b, CHANNELS
@@ -157,6 +165,9 @@ PlayCell:
 	call ChannelState
 	ld [hl], d ; CHANNEL_INSTRUMENT
 .instrumentDone
+	ld a, [wChannel]
+	cp WAVE_CHANNEL
+	jr z, PlayWaveCell
 	ld a, b
 	and a
 	jp nz, TriggerPulse
@@ -176,8 +187,102 @@ PlayCell:
 	ldh [c], a ; NRx4
 	ret
 
-; Triggers pulse channel wChannel with the note in b and its current instrument.
-TriggerPulse:
+; Plays the current row of the wave channel: b = note, c = instrument << 4 | effect,
+; e = effect parameter.
+PlayWaveCell:
+	ld a, b
+	and a
+	jr nz, TriggerWave
+
+	ld a, c
+	and $0F
+	cp EFFECT_SET_VOLUME
+	ret nz
+	; Set volume without a note: NR32 = (x & 3) << 5, no retrigger.
+	ld a, e
+	swap a
+	and $03
+	rrca ; Bits 1-0 to bits 6-5.
+	rrca
+	rrca
+	ldh [rNR32], a
+	ret
+
+; Triggers the wave channel with the note in b and its current instrument.
+TriggerWave:
+	call SetNotePeriod
+	call WaveInstrument
+	push hl
+	inc hl
+	ld a, [hl] ; Byte 1, bits 3-0: wave index.
+	and $0F
+	call LoadWave
+	pop hl
+
+	ld a, $80 ; DAC on
+	ldh [rNR30], a
+	ld a, [hl+]
+	ldh [rNR31], a
+	ld a, [hl]
+	ld d, a
+	and $60 ; Volume code.
+	ldh [rNR32], a
+	call ChannelState
+	inc hl ; CHANNEL_PERIOD
+	ld a, [hl+]
+	ldh [rNR33], a
+	ld a, d
+	and $80 ; Length enable, bit 7 of instrument byte 1.
+	rrca
+	or $80
+	or [hl]
+	ldh [rNR34], a
+	ret
+
+; Loads wave a (0-15) into wave RAM, unless it is already there. Clobbers af, bc, de, hl.
+LoadWave:
+	ld hl, wLoadedWave
+	cp [hl]
+	ret z
+	ld [hl], a
+	swap a ; WAVE_BYTES * index
+	ld e, a
+	ld d, 0
+	push de
+	ld a, HDR_WAVES
+	call SongHeaderWord
+	pop de
+	add hl, de
+
+	xor a ; DAC off while writing wave RAM.
+	ldh [rNR30], a
+	ld c, LOW(_WAVE_RAM)
+	ld b, WAVE_BYTES
+.byte
+	ld a, [hl+]
+	ldh [c], a
+	inc c
+	dec b
+	jr nz, .byte
+	ret
+
+; Out: hl = current wave instrument of the wave channel (2 bytes). Clobbers af, de.
+WaveInstrument:
+	call ChannelState
+	ld a, [hl] ; CHANNEL_INSTRUMENT
+	dec a
+	add a
+	ld e, a
+	ld d, 0
+	push de
+	ld a, HDR_WAVE_INSTRUMENTS
+	call SongHeaderWord
+	pop de
+	add hl, de
+	ret
+
+; Stores the period of note b in the state of channel wChannel. Clobbers af, de, hl.
+SetNotePeriod:
 	ld a, b
 	dec a
 	ld l, a
@@ -193,7 +298,11 @@ TriggerPulse:
 	ld a, e
 	ld [hl+], a
 	ld [hl], d
+	ret
 
+; Triggers pulse channel wChannel with the note in b and its current instrument.
+TriggerPulse:
+	call SetNotePeriod
 	call PulseInstrument
 	ld a, [wChannel]
 	and a
