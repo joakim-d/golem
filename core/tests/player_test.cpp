@@ -440,7 +440,7 @@ TEST(
     Player,
     UnsupportedEffectsThrow)
 {
-    for (const char* effect : {"301", "411"}) {
+    for (const char* effect : {"411", "4FF"}) {
         Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
         player.step();
         EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
@@ -983,6 +983,126 @@ TEST(
 {
     const auto frames = frames_of(on_channel(4, "00 C-4 1 110\n", "04"), 5);
     for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+// --- Tone portamento (3) ---
+
+namespace {
+
+const std::uint16_t kE4Period = 1650;
+const std::uint16_t kG4Period = 1714;
+
+} // namespace
+
+TEST(
+    Player,
+    TonePortamentoSlidesToTheNoteWithoutTriggering)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 ...\n01 E-4 . 340\n", "04"), 10);
+    EXPECT_TRUE(frames[5].empty()); // No trigger.
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 0x40));
+    EXPECT_EQ(frames[7], period_writes(reg::NR23, reg::NR24, kE4Period)); // Stops on E-4.
+    EXPECT_TRUE(frames[8].empty());
+    EXPECT_TRUE(frames[9].empty()); // Next row: nothing to restore.
+}
+
+TEST(
+    Player,
+    TonePortamentoSlidesDown)
+{
+    const auto frames = frames_of(on_channel(2, "00 G-4 2 ...\n01 C-4 . 380\n", "04"), 8);
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kG4Period - 0x80));
+    EXPECT_EQ(frames[7], period_writes(reg::NR23, reg::NR24, kC4Period));
+}
+
+TEST(
+    Player,
+    TonePortamentoOnTheFirstNoteTriggers)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 340\n", "04"), 4);
+    EXPECT_EQ(frames[1].size(), 4u); // The trigger.
+    EXPECT_TRUE(frames[2].empty()); // Already at the note: nothing to slide.
+}
+
+TEST(
+    Player,
+    TonePortamentoContinuesTowardTheTarget)
+{
+    // Row 1 (frames 4-6) slides + 0x10 twice; row 2 (frames 7-9) continues + 0x20 per tick.
+    const auto frames =
+        frames_of(on_channel(2, "00 C-4 2 ...\n01 G-4 . 310\n02 --- . 320\n", "03"), 10);
+    EXPECT_EQ(frames[6], period_writes(reg::NR23, reg::NR24, kC4Period + 0x20));
+    EXPECT_TRUE(frames[7].empty()); // Row tick: nothing to restore.
+    EXPECT_EQ(frames[8], period_writes(reg::NR23, reg::NR24, kC4Period + 0x40));
+    EXPECT_EQ(frames[9], period_writes(reg::NR23, reg::NR24, kC4Period + 0x60));
+}
+
+TEST(
+    Player,
+    TonePortamentoZeroOrWithoutTargetDoesNothing)
+{
+    auto frames = frames_of(on_channel(2, "00 C-4 2 ...\n01 E-4 . 300\n", "04"), 9);
+    for (std::size_t frame = 5; frame < 9; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+    frames = frames_of(on_channel(2, "00 C-4 2 ...\n01 --- . 340\n", "04"), 9);
+    for (std::size_t frame = 5; frame < 9; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    ANewNoteClearsTheTarget)
+{
+    const auto frames = frames_of(
+        on_channel(2, "00 C-4 2 ...\n01 E-4 . 301\n02 G-4 . ...\n03 --- . 310\n", "03"), 13);
+    for (std::size_t frame = 11; frame < 13; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    TheTargetBecomesTheArpeggioBase)
+{
+    // Row 1 makes E-4 the channel's note but only slides 1 per tick (C-4 + 3 after row 1).
+    // Row 2's arpeggio: + 12 from E-4 (E-5), + 0 (E-4 itself), then the slid period.
+    const auto frames =
+        frames_of(on_channel(2, "00 C-4 2 ...\n01 E-4 . 301\n02 --- . 0C0\n", "04"), 13);
+    EXPECT_EQ(frames[10], pitch(reg::NR23, reg::NR24, "E-5"));
+    EXPECT_EQ(frames[11], pitch(reg::NR23, reg::NR24, "E-4"));
+    EXPECT_EQ(frames[12], period_writes(reg::NR23, reg::NR24, kC4Period + 3));
+}
+
+TEST(
+    Player,
+    PitchIsRestoredBeforeATonePortamentoRow)
+{
+    // Row 1 ends on an arpeggio step; row 2's note does not trigger (3): restore first.
+    const auto frames =
+        frames_of(on_channel(2, "00 C-4 2 ...\n01 --- . 047\n02 E-4 . 301\n", "03"), 8);
+    EXPECT_EQ(frames[7], pitch(reg::NR23, reg::NR24, "C-4"));
+}
+
+TEST(
+    Player,
+    TonePortamentoOnTheWaveChannel)
+{
+    const auto frames = frames_of(on_channel(3, "00 C-4 1 ...\n01 E-4 . 340\n", "04"), 7);
+    EXPECT_EQ(frames[6], period_writes(reg::NR33, reg::NR34, kC4Period + 0x40, 0x40));
+}
+
+TEST(
+    Player,
+    TonePortamentoIsIgnoredOnTheNoiseChannel)
+{
+    // On noise the note simply triggers, and nothing slides.
+    const auto frames = frames_of(on_channel(4, "00 C-4 1 ...\n01 E-4 . 340\n", "04"), 9);
+    EXPECT_EQ(frames[5].size(), 4u);
+    for (std::size_t frame = 6; frame < 9; ++frame) {
         EXPECT_TRUE(frames[frame].empty()) << frame;
     }
 }

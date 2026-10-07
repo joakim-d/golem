@@ -19,6 +19,7 @@ namespace {
         kArpeggio = 0x0,
         kPortamentoUp = 0x1,
         kPortamentoDown = 0x2,
+        kTonePortamento = 0x3,
         kSetMasterVolume = 0x5,
         kCallRoutine = 0x6,
         kNoteDelay = 0x7,
@@ -53,6 +54,7 @@ namespace {
         case kArpeggio:
         case kPortamentoUp:
         case kPortamentoDown:
+        case kTonePortamento:
         case kSetMasterVolume:
         case kCallRoutine:
         case kNoteDelay:
@@ -115,11 +117,12 @@ std::vector<ApuWrite> Player::step()
                 channel.slide.reset();
                 channel.arpeggio.reset();
                 channel.portamento.reset();
+                channel.tone_portamento.reset();
             }
             play_row();
         } else {
             // Timed effects due on this tick (E, 7), slide steps (A), arpeggio steps (0)
-            // and portamento steps (1, 2), in channel order.
+            // and portamento steps (1, 2, 3), in channel order.
             // A channel has at most one: a cell holds a single effect.
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
                 Channel& state = channels_[channel];
@@ -135,6 +138,8 @@ std::vector<ApuWrite> Player::step()
                     arpeggio_step(channel);
                 } else if (state.portamento) {
                     portamento_step(channel);
+                } else if (state.tone_portamento) {
+                    tone_portamento_step(channel);
                 }
             }
         }
@@ -198,6 +203,18 @@ void Player::play_cell(
         channels_[channel].instrument = cell.instrument;
     }
     const bool has_effect = !is_empty_effect(cell);
+    Channel& state = channels_[channel];
+    if (cell.note != kNoteNone
+        && cell.effect == kTonePortamento
+        && channel != kNoise
+        && state.note != kNoteNone) {
+        // 3 with a note: no trigger. The note becomes the channel's note and the target its
+        // period slides toward.
+        state.note = cell.note;
+        state.target = note_period(cell.note);
+        state.tone_portamento = cell.param;
+        return;
+    }
     if (cell.note != kNoteNone && cell.effect == kNoteDelay && cell.param != 0) {
         // 7: the trigger moves to tick xx of the row, or is dropped past the row.
         if (cell.param < row_length_) {
@@ -238,6 +255,7 @@ void Player::trigger(
         state.period = note_period(note);
         state.note = note;
         state.pitch = state.period;
+        state.target.reset();
         if (channel == kPulse1) {
             write(reg::NR10, pulse.nr10());
         }
@@ -252,6 +270,7 @@ void Player::trigger(
         state.period = note_period(note);
         state.note = note;
         state.pitch = state.period;
+        state.target.reset();
         load_wave(overrides.timbre ? (*overrides.timbre & 0x0F) : wave.wave_index());
         write(reg::NR30, 0x80);
         write(reg::NR31, wave.nr31());
@@ -304,6 +323,11 @@ void Player::apply_effect(
     case kArpeggio:
         if (channel != kNoise) { // 0 has no effect on the noise channel.
             channels_[channel].arpeggio = cell.param;
+        }
+        break;
+    case kTonePortamento:
+        if (channel != kNoise) { // 3 has no effect on the noise channel.
+            channels_[channel].tone_portamento = cell.param;
         }
         break;
     case kPortamentoUp:
@@ -418,6 +442,41 @@ void Player::portamento_step(std::size_t channel)
     }
 }
 
+void Player::tone_portamento_step(std::size_t channel)
+{
+    Channel& state = channels_[channel];
+    if (!state.target || *state.tone_portamento == 0) {
+        return;
+    }
+    const int period = state.period;
+    const int target = *state.target;
+    const int step = *state.tone_portamento;
+    const int moved =
+        period < target ? std::min(period + step, target) : std::max(period - step, target);
+    if (moved != period) {
+        state.period = static_cast<std::uint16_t>(moved);
+        write_pitch(channel, state.period);
+    }
+}
+
+bool Player::triggers_on_row_tick(
+    std::size_t channel,
+    const Cell& cell) const
+{
+    if (cell.note == kNoteNone) {
+        return false;
+    }
+    if (cell.effect == kNoteDelay && cell.param != 0) {
+        return false;
+    }
+    if (cell.effect == kTonePortamento
+        && channel != kNoise
+        && channels_[channel].note != kNoteNone) {
+        return false;
+    }
+    return true;
+}
+
 void Player::restore_pitch(
     std::size_t channel,
     const Cell& cell)
@@ -426,8 +485,7 @@ void Player::restore_pitch(
     if (channel == kNoise || state.pitch == state.period) {
         return;
     }
-    const bool delayed = cell.effect == kNoteDelay && cell.param != 0;
-    if (cell.note != kNoteNone && !delayed) {
+    if (triggers_on_row_tick(channel, cell)) {
         return; // The trigger writes the new note's pitch.
     }
     write_pitch(channel, state.period);

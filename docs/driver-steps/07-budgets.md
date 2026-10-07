@@ -57,7 +57,7 @@ Out:
 | Budget | Limit |
 |---|---|
 | `GolemPlay` (every call of every driver test) | 14000 cycles, about 20% of a frame |
-| ROM | 2048 bytes |
+| ROM | 3072 bytes (2048 until step 14) |
 | WRAM | 128 bytes (64 until step 10) |
 
 **Raising a limit** is a deliberate change: update it here and in `driver/CMakeLists.txt` in the same PR, with the reason.
@@ -67,3 +67,4 @@ Out:
 | Step | Budget | From → to | Reason |
 |---|---|---|---|
 | 10 (volume slide) | WRAM | 64 → 128 bytes | The timed effects (steps 08–09) brought the driver to 45 bytes, and the continuous effects need per-channel state: A adds a volume and a slide per channel (53 bytes); arpeggio, portamento and vibrato will need more. |
+| 14 (tone portamento) | ROM | 2048 → 3072 bytes | After portamento (step 13) the driver used 1892 bytes. Tone portamento and vibrato do not fit in the remaining 156 bytes, and both are wanted. Saving space by merging the per-channel code paths first was considered, but the gain was uncertain (about 200–300 bytes). |

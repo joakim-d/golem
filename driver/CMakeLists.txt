@@ -4,7 +4,7 @@
 # Budgets (docs/driver-steps/07-budgets.md): T-cycles per GolemPlay call, and bytes of the
 # driver's ROM section ("Golem driver") and WRAM section ("Golem state").
 set(GOLEM_DRIVER_MAX_PLAY_CYCLES 14000)
-set(GOLEM_DRIVER_MAX_ROM_BYTES 2048)
+set(GOLEM_DRIVER_MAX_ROM_BYTES 3072)
 set(GOLEM_DRIVER_MAX_WRAM_BYTES 128)
 
 find_program(RGBASM rgbasm)
@@ -97,6 +97,7 @@ golem_driver_test(delay) # Step 9
 golem_driver_test(slide) # Step 10
 golem_driver_test(arpeggio) # Step 12
 golem_driver_test(portamento) # Step 13
+golem_driver_test(tone) # Step 14
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
 
