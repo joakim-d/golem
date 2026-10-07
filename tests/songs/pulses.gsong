@@ -1,0 +1,41 @@
+# Driver step 2: both pulse channels. Notes on the same and on different rows, instrument
+# switches on both channels (one without a note), length enable and a sweep byte (written to
+# NR10 on channel 1 only), and note offs (C00) on both.
+ticks_per_row 04
+
+pulse 1 00 80 F0            # 50% duty, no length
+pulse 2 9A 3F A1            # length enable, sweep pace 1 down 2 steps, 12.5% duty
+pulse 3 00 C0 72            # 75% duty, envelope down
+
+order 01 02 00 00
+order 03 04 00 00
+
+pattern 00
+
+pattern 01                  # channel 1, order 0
+00 C-4 1 ...
+04 E-4 . ...
+08 --- . C00
+0C G-4 2 ...
+10 --- . C00
+18 C-5 3 ...
+
+pattern 02                  # channel 2, order 0
+00 E-3 2 ...
+06 G-3 . ...
+08 --- . C00
+0C B-3 1 ...
+14 --- . C00
+18 D-5 3 ...
+1C --- . C00
+
+pattern 03                  # channel 1, order 1: keeps instrument 3
+00 A-4 . ...
+10 --- . C00
+20 F-4 1 ...
+3C --- . C00
+
+pattern 04                  # channel 2, order 1
+04 --- 2 ...                # instrument only
+08 A-3 . ...
+24 --- . C00

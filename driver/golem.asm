@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 1, channel 1 only).
+; Current scope: docs/driver-steps/ (step 2, pulse channels 1 and 2).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -7,11 +7,21 @@ INCLUDE "golem.inc"
 ; Song header offsets (docs/song-format.md).
 DEF HDR_TICKS_PER_ROW EQU 0
 DEF HDR_ORDER_COUNT EQU 1
-DEF HDR_ORDER_TABLE_1 EQU 3
+DEF HDR_ORDER_TABLES EQU 3 ; One pointer per channel.
 DEF HDR_PULSE_INSTRUMENTS EQU 11
 
+DEF CHANNELS EQU 4
+DEF PLAYED_CHANNELS EQU 2 ; Channels the driver plays so far: 1 and 2.
 DEF ROWS_PER_PATTERN EQU 64
 DEF EFFECT_SET_VOLUME EQU $C
+
+; Per-channel state, CHANNEL_SIZE bytes each in wChannels.
+RSRESET
+DEF CHANNEL_INSTRUMENT RB 1 ; 1..15
+DEF CHANNEL_PERIOD RB 2 ; Little-endian, period of the last note.
+DEF CHANNEL_UNUSED RB 1
+DEF CHANNEL_SIZE RB 0
+ASSERT CHANNEL_SIZE == 4, "ChannelState and GolemInit assume 4 bytes per channel"
 
 SECTION "Golem state", WRAM0
 wSong: ds 2
@@ -20,8 +30,8 @@ wTick: ds 1
 wRow: ds 1
 wOrder: ds 1
 wOrderCount: ds 1
-wCh1Instrument: ds 1 ; 1..15
-wCh1Period: ds 2 ; Little-endian, period of the last note.
+wChannel: ds 1 ; Channel being played, 0-based.
+wChannels: ds CHANNEL_SIZE * CHANNELS
 
 SECTION "Golem driver", ROM0
 GolemInit::
@@ -40,10 +50,18 @@ GolemInit::
 	ld [wTick], a
 	ld [wRow], a
 	ld [wOrder], a
-	ld [wCh1Period], a
-	ld [wCh1Period + 1], a
-	inc a
-	ld [wCh1Instrument], a
+	; Every channel starts with instrument 1 and period 0.
+	ld hl, wChannels
+	ld b, CHANNELS
+.channel
+	ld a, 1
+	ld [hl+], a ; CHANNEL_INSTRUMENT
+	xor a
+	ld [hl+], a ; CHANNEL_PERIOD
+	ld [hl+], a
+	ld [hl+], a ; CHANNEL_UNUSED
+	dec b
+	jr nz, .channel
 
 	ld a, $80 ; APU on
 	ldh [rNR52], a
@@ -91,10 +109,24 @@ GolemPlay::
 	ld [wOrder], a
 	ret
 
-; Plays the current row of channel 1 (row tick).
+; Plays the current row of every channel, in channel order (row tick).
 PlayRow:
-	; hl = order table of channel 1, then the pattern of the current order.
-	ld a, HDR_ORDER_TABLE_1
+	xor a
+.channel
+	ld [wChannel], a
+	call PlayCell
+	ld a, [wChannel]
+	inc a
+	cp PLAYED_CHANNELS
+	jr nz, .channel
+	ret
+
+; Plays the current row of channel wChannel.
+PlayCell:
+	; hl = order table of the channel, then the pattern of the current order.
+	ld a, [wChannel]
+	add a
+	add HDR_ORDER_TABLES
 	call SongHeaderWord
 	ld a, [wOrder]
 	ld e, a
@@ -121,27 +153,31 @@ PlayRow:
 	swap a
 	and $0F
 	jr z, .instrumentDone
-	ld [wCh1Instrument], a
+	ld d, a
+	call ChannelState
+	ld [hl], d ; CHANNEL_INSTRUMENT
 .instrumentDone
 	ld a, b
 	and a
-	jr z, .noNote
-	jp TriggerChannel1
+	jp nz, TriggerPulse
 
-.noNote
 	ld a, c
 	and $0F
 	cp EFFECT_SET_VOLUME
 	ret nz
-	; Set volume without a note: NR12 = xx, then retrigger.
+	; Set volume without a note: NRx2 = xx, then retrigger.
+	call PulseNrx1Address
+	inc c
 	ld a, e
-	ldh [rNR12], a
-	call Channel1Nr14
-	ldh [rNR14], a
+	ldh [c], a ; NRx2
+	inc c
+	inc c
+	call PulseNrx4
+	ldh [c], a ; NRx4
 	ret
 
-; Triggers channel 1 with the note in b and the current instrument.
-TriggerChannel1:
+; Triggers pulse channel wChannel with the note in b and its current instrument.
+TriggerPulse:
 	ld a, b
 	dec a
 	ld l, a
@@ -150,48 +186,92 @@ TriggerChannel1:
 	ld de, NotePeriods
 	add hl, de
 	ld a, [hl+]
-	ld [wCh1Period], a
-	ld a, [hl]
-	ld [wCh1Period + 1], a
+	ld d, [hl]
+	ld e, a
+	call ChannelState
+	inc hl ; CHANNEL_PERIOD
+	ld a, e
+	ld [hl+], a
+	ld [hl], d
 
-	call Channel1Instrument
-	ld a, [hl+]
+	call PulseInstrument
+	ld a, [wChannel]
+	and a
+	jr nz, .sweepDone
+	ld a, [hl]
 	and $7F ; Without the length enable bit.
 	ldh [rNR10], a
+.sweepDone
+	inc hl
+	call PulseNrx1Address
 	ld a, [hl+]
-	ldh [rNR11], a
+	ldh [c], a ; NRx1
+	inc c
 	ld a, [hl]
-	ldh [rNR12], a
-	ld a, [wCh1Period]
-	ldh [rNR13], a
-	call Channel1Nr14
-	ldh [rNR14], a
+	ldh [c], a ; NRx2
+	inc c
+	call ChannelState
+	inc hl ; CHANNEL_PERIOD, low byte
+	ld a, [hl]
+	ldh [c], a ; NRx3
+	inc c
+	call PulseNrx4
+	ldh [c], a ; NRx4
 	ret
 
-; Out: a = NR14 for a trigger: $80 | length enable << 6 | period bits 10-8.
-; Clobbers de, hl.
-Channel1Nr14:
-	call Channel1Instrument
+; Out: a = NRx4 of pulse channel wChannel for a trigger:
+; $80 | length enable << 6 | period bits 10-8. Clobbers de, hl.
+PulseNrx4:
+	call PulseInstrument
 	ld a, [hl]
 	and $80 ; Length enable, bit 7 of instrument byte 0.
 	rrca
 	or $80
 	ld d, a
-	ld a, [wCh1Period + 1]
+	call ChannelState
+	inc hl ; CHANNEL_PERIOD
+	inc hl
+	ld a, [hl]
 	or d
 	ret
 
-; Out: hl = current pulse instrument of channel 1 (3 bytes). Clobbers af, de.
-Channel1Instrument:
-	ld a, HDR_PULSE_INSTRUMENTS
-	call SongHeaderWord
-	ld a, [wCh1Instrument]
+; Out: c = low byte of NRx1 of pulse channel wChannel ($11 or $16). Clobbers af.
+PulseNrx1Address:
+	ld a, [wChannel]
+	ld c, a
+	add a
+	add a
+	add c ; 5 registers per channel.
+	add LOW(rNR11)
+	ld c, a
+	ret
+
+; Out: hl = current pulse instrument of channel wChannel (3 bytes). Clobbers af, de.
+PulseInstrument:
+	call ChannelState
+	ld a, [hl] ; CHANNEL_INSTRUMENT
 	dec a
 	ld e, a
 	ld d, 0
+	push de
+	ld a, HDR_PULSE_INSTRUMENTS
+	call SongHeaderWord
+	pop de
 	add hl, de
 	add hl, de
 	add hl, de
+	ret
+
+; Out: hl = state of channel wChannel. Clobbers af.
+ChannelState:
+	ld a, [wChannel]
+	add a
+	add a ; CHANNEL_SIZE
+	add LOW(wChannels)
+	ld l, a
+	adc HIGH(wChannels)
+	sub l
+	ld h, a
 	ret
 
 ; In: a = offset of a pointer in the song header. Out: hl = that pointer. Clobbers af, de.
