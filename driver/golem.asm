@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 5, all four channels and flow control).
+; Current scope: docs/driver-steps/ (step 6, all channels, flow and register effects).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -17,6 +17,9 @@ DEF CHANNELS EQU 4
 DEF WAVE_CHANNEL EQU 2 ; 0-based
 DEF NOISE_CHANNEL EQU 3
 DEF ROWS_PER_PATTERN EQU 64
+DEF EFFECT_SET_MASTER_VOLUME EQU $5
+DEF EFFECT_SET_PANNING EQU $8
+DEF EFFECT_CHANGE_TIMBRE EQU $9
 DEF EFFECT_POSITION_JUMP EQU $B
 DEF EFFECT_SET_VOLUME EQU $C
 DEF EFFECT_PATTERN_BREAK EQU $D
@@ -28,13 +31,18 @@ DEF NO_WAVE EQU $FF
 DEF FLOW_JUMP EQU 0 ; B: continue at wJumpOrder.
 DEF FLOW_BREAK EQU 1 ; D: continue at row wBreakRow.
 
+; wOverride bits: 9 or C on a row with a note, folded into the trigger.
+DEF OVERRIDE_TIMBRE EQU 0 ; 9
+DEF OVERRIDE_VOLUME EQU 1 ; C
+
 ; Per-channel state, CHANNEL_SIZE bytes each in wChannels.
 RSRESET
 DEF CHANNEL_INSTRUMENT RB 1 ; 1..15
 DEF CHANNEL_PERIOD RB 2 ; Little-endian, period of the last note.
-DEF CHANNEL_UNUSED RB 1
+DEF CHANNEL_NOISE RB 1 ; Channel 4: NR43 of the last note, without the width bit.
 DEF CHANNEL_SIZE RB 0
 ASSERT CHANNEL_SIZE == 4, "ChannelState and GolemInit assume 4 bytes per channel"
+ASSERT CHANNEL_NOISE == 3, "TriggerNoise and NoiseTimbre assume CHANNEL_NOISE at offset 3"
 
 SECTION "Golem state", WRAM0
 wSong: ds 2
@@ -48,6 +56,9 @@ wFlow: ds 1 ; FLOW_JUMP and FLOW_BREAK flags.
 wJumpOrder: ds 1
 wBreakRow: ds 1
 wChannel: ds 1 ; Channel being played, 0-based.
+wEffect: ds 1 ; Effect of the cell being played.
+wParam: ds 1 ; Its parameter.
+wOverride: ds 1 ; OVERRIDE_TIMBRE and OVERRIDE_VOLUME flags.
 wChannels: ds CHANNEL_SIZE * CHANNELS
 wLoadedWave: ds 1 ; Wave in wave RAM, or NO_WAVE.
 
@@ -71,7 +82,7 @@ GolemInit::
 	ld [wFlow], a
 	ld a, NO_WAVE
 	ld [wLoadedWave], a
-	; Every channel starts with instrument 1 and period 0.
+	; Every channel starts with instrument 1, period 0 and noise value 0.
 	ld hl, wChannels
 	ld b, CHANNELS
 .channel
@@ -80,7 +91,7 @@ GolemInit::
 	xor a
 	ld [hl+], a ; CHANNEL_PERIOD
 	ld [hl+], a
-	ld [hl+], a ; CHANNEL_UNUSED
+	ld [hl+], a ; CHANNEL_NOISE
 	dec b
 	jr nz, .channel
 
@@ -182,7 +193,8 @@ PlayRow:
 	jr nz, .channel
 	ret
 
-; Plays the current row of channel wChannel.
+; Plays the current row of channel wChannel: instrument column, flow effects, trigger,
+; then the effect's own writes.
 PlayCell:
 	; hl = order table of the channel, then the pattern of the current order.
 	ld a, [wChannel]
@@ -209,6 +221,10 @@ PlayCell:
 	ld a, [hl+]
 	ld c, a
 	ld e, [hl]
+	and $0F
+	ld [wEffect], a
+	ld a, e
+	ld [wParam], a
 
 	ld a, c
 	swap a
@@ -220,46 +236,95 @@ PlayCell:
 .instrumentDone
 	; Flow effects make no APU writes: record them whatever else the row does. A later
 	; channel overwrites an earlier one's target, so the highest channel wins.
-	ld a, c
-	and $0F
+	ld a, [wEffect]
 	cp EFFECT_POSITION_JUMP
 	jr z, .positionJump
 	cp EFFECT_PATTERN_BREAK
 	jr z, .patternBreak
 	cp EFFECT_SET_TEMPO
-	jr nz, .channel
+	jr nz, .override
 	ld a, e
 	ld [wTicksPerRow], a
-	jr .channel
+	jr .override
 .positionJump
 	ld a, e
 	ld [wJumpOrder], a
 	ld hl, wFlow
 	set FLOW_JUMP, [hl]
-	jr .channel
+	jr .override
 .patternBreak
 	ld a, e
 	ld [wBreakRow], a
 	ld hl, wFlow
 	set FLOW_BREAK, [hl]
-.channel
-	ld a, [wChannel]
-	cp WAVE_CHANNEL
-	jr z, PlayWaveCell
-	cp NOISE_CHANNEL
-	jp z, PlayNoiseCell
+
+.override
+	; 9 or C on a row with a note change the trigger instead of making their own writes.
+	ld d, 0
 	ld a, b
 	and a
-	jp nz, TriggerPulse
+	jr z, .setOverride
+	ld a, [wEffect]
+	cp EFFECT_CHANGE_TIMBRE
+	jr nz, .notTimbre
+	ld d, 1 << OVERRIDE_TIMBRE
+	jr .setOverride
+.notTimbre
+	cp EFFECT_SET_VOLUME
+	jr nz, .setOverride
+	ld d, 1 << OVERRIDE_VOLUME
+.setOverride
+	ld a, d
+	ld [wOverride], a
 
-	ld a, c
-	and $0F
+	ld a, b
+	and a
+	jr z, ApplyEffect
+	call Trigger
+	ld a, [wOverride]
+	and a
+	ret nz ; The effect was folded into the trigger.
+	; Fall through: 5 and 8 are written after the trigger.
+
+; Makes the APU writes of the row's effect: 5, 8, and 9 and C without a note. Effects
+; without writes (6, B, D, F) and those not specified yet do nothing here.
+ApplyEffect:
+	ld a, [wEffect]
+	cp EFFECT_SET_MASTER_VOLUME
+	jr z, .masterVolume
+	cp EFFECT_SET_PANNING
+	jr z, .panning
+	cp EFFECT_CHANGE_TIMBRE
+	jr z, .timbre
 	cp EFFECT_SET_VOLUME
 	ret nz
-	; Set volume without a note: NRx2 = xx, then retrigger.
+	ld a, [wChannel]
+	cp WAVE_CHANNEL
+	jr z, WaveSetVolume
+	cp NOISE_CHANNEL
+	jr z, NoiseSetVolume
+	jr PulseSetVolume
+.timbre
+	ld a, [wChannel]
+	cp WAVE_CHANNEL
+	jr z, WaveTimbre
+	cp NOISE_CHANNEL
+	jr z, NoiseTimbre
+	jr PulseTimbre
+.masterVolume
+	ld a, [wParam]
+	ldh [rNR50], a
+	ret
+.panning
+	ld a, [wParam]
+	ldh [rNR51], a
+	ret
+
+; C without a note on a pulse channel: NRx2 = xx, then retrigger.
+PulseSetVolume:
 	call PulseNrx1Address
 	inc c
-	ld a, e
+	ld a, [wParam]
 	ldh [c], a ; NRx2
 	inc c
 	inc c
@@ -267,36 +332,87 @@ PlayCell:
 	ldh [c], a ; NRx4
 	ret
 
-; Plays the current row of the wave channel: b = note, c = instrument << 4 | effect,
-; e = effect parameter.
-PlayWaveCell:
-	ld a, b
-	and a
-	jr nz, TriggerWave
+; 9 without a note on a pulse channel: NRx1 = xx.
+PulseTimbre:
+	call PulseNrx1Address
+	ld a, [wParam]
+	ldh [c], a ; NRx1
+	ret
 
-	ld a, c
-	and $0F
-	cp EFFECT_SET_VOLUME
-	ret nz
-	; Set volume without a note: NR32 = (x & 3) << 5, no retrigger.
-	ld a, e
-	swap a
-	and $03
-	rrca ; Bits 1-0 to bits 6-5.
-	rrca
-	rrca
+; C without a note on the wave channel: NR32 = (x & 3) << 5, no retrigger.
+WaveSetVolume:
+	call WaveVolumeFromParam
 	ldh [rNR32], a
 	ret
 
-; Triggers the wave channel with the note in b and its current instrument.
+; 9 without a note on the wave channel: load wave y and retrigger, unless it is loaded.
+WaveTimbre:
+	ld a, [wParam]
+	and $0F
+	ld hl, wLoadedWave
+	cp [hl]
+	ret z
+	call LoadWave
+	ld a, $80 ; DAC on
+	ldh [rNR30], a
+	call WaveNr34
+	ldh [rNR34], a
+	ret
+
+; C without a note on the noise channel: NR42 = xx, then retrigger.
+NoiseSetVolume:
+	ld a, [wParam]
+	ldh [rNR42], a
+	ld a, HDR_NOISE_INSTRUMENTS
+	call TwoByteInstrument
+	ld a, [hl]
+	and $40 ; Length enable, already at its NR44 position.
+	or $80
+	ldh [rNR44], a
+	ret
+
+; 9 without a note on the noise channel: NR43 = noise value of the last note, with the
+; 7-bit LFSR bit when xx is not 0.
+NoiseTimbre:
+	call ChannelState
+	inc hl
+	inc hl
+	inc hl ; CHANNEL_NOISE
+	ld a, [wParam]
+	and a
+	ld a, [hl]
+	jr z, .write
+	or $08
+.write
+	ldh [rNR43], a
+	ret
+
+; Triggers channel wChannel with the note in b, its current instrument and wOverride.
+Trigger:
+	ld a, [wChannel]
+	cp WAVE_CHANNEL
+	jr z, TriggerWave
+	cp NOISE_CHANNEL
+	jp z, TriggerNoise
+	jp TriggerPulse
+
+; Triggers the wave channel with the note in b.
 TriggerWave:
 	call SetNotePeriod
 	ld a, HDR_WAVE_INSTRUMENTS
 	call TwoByteInstrument
 	push hl
 	inc hl
-	ld a, [hl] ; Byte 1, bits 3-0: wave index.
+	ld a, [hl] ; Byte 1, bits 3-0: wave index, unless 9 gives it.
 	and $0F
+	ld e, a
+	ld a, [wOverride]
+	bit OVERRIDE_TIMBRE, a
+	ld a, e
+	jr z, .loadWave
+	ld a, [wParam]
+	and $0F
+.loadWave
 	call LoadWave
 	pop hl
 
@@ -306,18 +422,48 @@ TriggerWave:
 	ldh [rNR31], a
 	ld a, [hl]
 	ld d, a
-	and $60 ; Volume code.
+	and $60 ; Volume code, unless C gives it.
+	ld e, a
+	ld a, [wOverride]
+	bit OVERRIDE_VOLUME, a
+	ld a, e
+	jr z, .volume
+	call WaveVolumeFromParam
+.volume
 	ldh [rNR32], a
 	call ChannelState
 	inc hl ; CHANNEL_PERIOD
-	ld a, [hl+]
+	ld a, [hl]
 	ldh [rNR33], a
-	ld a, d
+	call WaveNr34
+	ldh [rNR34], a
+	ret
+
+; Out: a = NR34 for a trigger: $80 | length enable << 6 | period bits 10-8. Clobbers de, hl.
+WaveNr34:
+	ld a, HDR_WAVE_INSTRUMENTS
+	call TwoByteInstrument
+	inc hl
+	ld a, [hl]
 	and $80 ; Length enable, bit 7 of instrument byte 1.
 	rrca
 	or $80
-	or [hl]
-	ldh [rNR34], a
+	ld d, a
+	call ChannelState
+	inc hl ; CHANNEL_PERIOD
+	inc hl
+	ld a, [hl]
+	or d
+	ret
+
+; Out: a = NR32 volume code from the x nibble of wParam: (x & 3) << 5. Clobbers f.
+WaveVolumeFromParam:
+	ld a, [wParam]
+	swap a
+	and $03
+	rrca ; Bits 1-0 to bits 6-5.
+	rrca
+	rrca
 	ret
 
 ; Loads wave a (0-15) into wave RAM, unless it is already there. Clobbers af, bc, de, hl.
@@ -347,29 +493,7 @@ LoadWave:
 	jr nz, .byte
 	ret
 
-; Plays the current row of the noise channel: b = note, c = instrument << 4 | effect,
-; e = effect parameter.
-PlayNoiseCell:
-	ld a, b
-	and a
-	jr nz, TriggerNoise
-
-	ld a, c
-	and $0F
-	cp EFFECT_SET_VOLUME
-	ret nz
-	; Set volume without a note: NR42 = xx, then retrigger.
-	ld a, e
-	ldh [rNR42], a
-	ld a, HDR_NOISE_INSTRUMENTS
-	call TwoByteInstrument
-	ld a, [hl]
-	and $40 ; Length enable, already at its NR44 position.
-	or $80
-	ldh [rNR44], a
-	ret
-
-; Triggers the noise channel with the note in b and its current instrument.
+; Triggers the noise channel with the note in b.
 TriggerNoise:
 	ld a, HDR_NOISE_INSTRUMENTS
 	call TwoByteInstrument
@@ -377,24 +501,47 @@ TriggerNoise:
 	ld d, a ; Byte 0: LFSR width, length enable, length timer.
 	and $3F
 	ldh [rNR41], a
-	ld a, [hl]
+	ld a, [wOverride]
+	ld e, a
+	ld a, [hl] ; Envelope, unless C gives it.
+	bit OVERRIDE_VOLUME, e
+	jr z, .envelope
+	ld a, [wParam]
+.envelope
 	ldh [rNR42], a
 
+	; c = noise value of the note, kept for 9 without a note.
 	ld a, b
 	dec a
+	add LOW(NoiseNr43)
 	ld l, a
-	ld h, 0
-	push de
-	ld de, NoiseNr43
-	add hl, de
-	pop de
+	adc HIGH(NoiseNr43)
+	sub l
+	ld h, a
+	ld c, [hl]
+	call ChannelState
+	inc hl
+	inc hl
+	inc hl ; CHANNEL_NOISE
+	ld [hl], c
+
+	; LFSR width: from the instrument (bit 7), unless 9 gives it (xx != 0).
+	bit OVERRIDE_TIMBRE, e
+	jr nz, .timbreWidth
 	ld a, d
-	and $80 ; 7-bit LFSR: bit 7 to NR43 bit 3.
+	and $80
+	jr .width
+.timbreWidth
+	ld a, [wParam]
+	and a
+	jr z, .width
+	ld a, $80
+.width
+	rrca ; Bit 7 to NR43 bit 3.
 	rrca
 	rrca
 	rrca
-	rrca
-	or [hl]
+	or c
 	ldh [rNR43], a
 
 	ld a, d
@@ -439,7 +586,7 @@ SetNotePeriod:
 	ld [hl], d
 	ret
 
-; Triggers pulse channel wChannel with the note in b and its current instrument.
+; Triggers pulse channel wChannel with the note in b.
 TriggerPulse:
 	call SetNotePeriod
 	call PulseInstrument
@@ -452,10 +599,20 @@ TriggerPulse:
 .sweepDone
 	inc hl
 	call PulseNrx1Address
-	ld a, [hl+]
+	ld a, [wOverride]
+	ld e, a
+	ld a, [hl+] ; Duty and length, unless 9 gives them.
+	bit OVERRIDE_TIMBRE, e
+	jr z, .nrx1
+	ld a, [wParam]
+.nrx1
 	ldh [c], a ; NRx1
 	inc c
-	ld a, [hl]
+	ld a, [hl] ; Envelope, unless C gives it.
+	bit OVERRIDE_VOLUME, e
+	jr z, .nrx2
+	ld a, [wParam]
+.nrx2
 	ldh [c], a ; NRx2
 	inc c
 	call ChannelState

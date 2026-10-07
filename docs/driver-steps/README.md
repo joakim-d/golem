@@ -10,7 +10,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [03](03-wave.md) | Channel 3 and wave loading | `driver.wave` | Done |
 | [04](04-noise.md) | Channel 4 and the noise table | `driver.noise`, `driver.minimal`, `driver.instruments` | Done |
 | [05](05-flow.md) | Tempo (F), position jump (B), pattern break (D) | `driver.flow`, `driver.jumps` | Done |
-| [06](06-register-effects.md) | Effects 5, 6, 8, 9, C on every channel, folded triggers | `driver.registers` | To do |
+| [06](06-register-effects.md) | Effects 5, 6, 8, 9, C on every channel, folded triggers | `driver.registers`, `driver.effects` | Done |
 | [07](07-budgets.md) | Cycle and size budgets enforced by the tests | Budget tests | To do |
 
 ## Rules for every step
