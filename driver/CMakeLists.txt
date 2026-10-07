@@ -95,6 +95,7 @@ golem_driver_test(effects) # Step 6
 golem_driver_test(cut) # Step 8
 golem_driver_test(delay) # Step 9
 golem_driver_test(slide) # Step 10
+golem_driver_test(arpeggio) # Step 12
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
 

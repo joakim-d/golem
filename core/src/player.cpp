@@ -16,6 +16,7 @@ namespace {
     constexpr unsigned kMaxTicksPerRow = 256;
 
     enum Effect : std::uint8_t {
+        kArpeggio = 0x0,
         kSetMasterVolume = 0x5,
         kCallRoutine = 0x6,
         kNoteDelay = 0x7,
@@ -47,6 +48,7 @@ namespace {
     bool is_supported(std::uint8_t effect)
     {
         switch (effect) {
+        case kArpeggio:
         case kSetMasterVolume:
         case kCallRoutine:
         case kNoteDelay:
@@ -107,10 +109,12 @@ std::vector<ApuWrite> Player::step()
                 channel.cut_tick.reset();
                 channel.delay_tick.reset();
                 channel.slide.reset();
+                channel.arpeggio.reset();
             }
             play_row();
         } else {
-            // Timed effects due on this tick (E, 7) and slide steps (A), in channel order.
+            // Timed effects due on this tick (E, 7), slide steps (A) and arpeggio steps
+            // (0), in channel order.
             // A channel has at most one: a cell holds a single effect.
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
                 Channel& state = channels_[channel];
@@ -122,6 +126,8 @@ std::vector<ApuWrite> Player::step()
                     trigger(channel, state.delay_note, {});
                 } else if (state.slide) {
                     slide_volume(channel);
+                } else if (state.arpeggio) {
+                    arpeggio_step(channel);
                 }
             }
         }
@@ -172,6 +178,7 @@ void Player::play_row()
                 + std::to_string(cell.effect)
                 + " is not implemented");
         }
+        restore_pitch(channel, cell);
         play_cell(channel, cell);
     }
 }
@@ -222,6 +229,8 @@ void Player::trigger(
         const auto& pulse = song_.pulse_instruments[instrument];
         const auto base = pulse_base(channel);
         state.period = note_period(note);
+        state.note = note;
+        state.pitch = state.period;
         if (channel == kPulse1) {
             write(reg::NR10, pulse.nr10());
         }
@@ -234,6 +243,8 @@ void Player::trigger(
     } else if (channel == kWave) {
         const auto& wave = song_.wave_instruments[instrument];
         state.period = note_period(note);
+        state.note = note;
+        state.pitch = state.period;
         load_wave(overrides.timbre ? (*overrides.timbre & 0x0F) : wave.wave_index());
         write(reg::NR30, 0x80);
         write(reg::NR31, wave.nr31());
@@ -282,6 +293,11 @@ void Player::apply_effect(
         break;
     case kSetVolume:
         set_volume(channel, cell.param);
+        break;
+    case kArpeggio:
+        if (channel != kNoise) { // 0 has no effect on the noise channel.
+            channels_[channel].arpeggio = cell.param;
+        }
         break;
     case kVolumeSlide:
         if (channel != kWave) { // A has no effect on the wave channel.
@@ -351,6 +367,54 @@ void Player::slide_volume(std::size_t channel)
     } else {
         write(reg::NR42, nrx2);
         write(reg::NR44, kTrigger | length);
+    }
+}
+
+void Player::arpeggio_step(std::size_t channel)
+{
+    const Channel& state = channels_[channel];
+    if (state.note == kNoteNone) {
+        return;
+    }
+    const unsigned step = tick_ % 3;
+    const unsigned offset = step == 0 ? 0u
+                          : step == 1 ? *state.arpeggio >> 4
+                                      : *state.arpeggio & 0x0F;
+    const auto note =
+        static_cast<std::uint8_t>(std::min(state.note + offset, unsigned {kLastNote}));
+    const std::uint16_t period = note_period(note);
+    if (period != state.pitch) {
+        write_pitch(channel, period);
+    }
+}
+
+void Player::restore_pitch(
+    std::size_t channel,
+    const Cell& cell)
+{
+    const Channel& state = channels_[channel];
+    if (channel == kNoise || state.pitch == state.period) {
+        return;
+    }
+    const bool delayed = cell.effect == kNoteDelay && cell.param != 0;
+    if (cell.note != kNoteNone && !delayed) {
+        return; // The trigger writes the new note's pitch.
+    }
+    write_pitch(channel, state.period);
+}
+
+void Player::write_pitch(
+    std::size_t channel,
+    std::uint16_t period)
+{
+    channels_[channel].pitch = period;
+    const std::uint8_t length = length_enable_bit(channel);
+    if (channel == kWave) {
+        write(reg::NR33, low(period));
+        write(reg::NR34, length | high(period));
+    } else {
+        write(pulse_base(channel) + 3, low(period));
+        write(pulse_base(channel) + 4, length | high(period));
     }
 }
 

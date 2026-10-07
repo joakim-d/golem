@@ -440,7 +440,7 @@ TEST(
     Player,
     UnsupportedEffectsThrow)
 {
-    for (const char* effect : {"001", "1FF", "200", "301", "411"}) {
+    for (const char* effect : {"1FF", "200", "301", "411"}) {
         Player player(make_song(on_channel(2, std::string("00 A-4 1 ") + effect + "\n")));
         player.step();
         EXPECT_THROW(player.step(), UnsupportedEffect) << effect;
@@ -734,6 +734,136 @@ TEST(
     EXPECT_EQ(
         frames[2],
         (Writes {{reg::NR12, 0xB0}, {reg::NR14, 0x86}, {reg::NR22, 0xB0}, {reg::NR24, 0x86}}));
+}
+
+// --- Arpeggio (0) ---
+
+namespace {
+
+// NRx3/NRx4 writes (no trigger bit) that set `note` on a pulse or wave channel.
+Writes pitch(
+    std::uint16_t nrx3,
+    std::uint16_t nrx4,
+    const char* note,
+    std::uint8_t length = 0)
+{
+    const auto period = note_period(*parse_note_name(note));
+    return {
+        {nrx3, static_cast<std::uint8_t>(period & 0xFF)},
+        {nrx4, static_cast<std::uint8_t>(length | period >> 8)}};
+}
+
+} // namespace
+
+TEST(
+    Player,
+    ArpeggioCyclesBaseXYAndRestoresTheBase)
+{
+    // C-4 + 4 = E-4, + 7 = G-4; tick % 3 = 0 is the base.
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 047\n", "06"), 8);
+    EXPECT_EQ(frames[1].size(), 4u); // The trigger.
+    EXPECT_EQ(frames[2], pitch(reg::NR23, reg::NR24, "E-4"));
+    EXPECT_EQ(frames[3], pitch(reg::NR23, reg::NR24, "G-4"));
+    EXPECT_EQ(frames[4], pitch(reg::NR23, reg::NR24, "C-4"));
+    EXPECT_EQ(frames[5], pitch(reg::NR23, reg::NR24, "E-4"));
+    EXPECT_EQ(frames[6], pitch(reg::NR23, reg::NR24, "G-4"));
+    EXPECT_EQ(frames[7], pitch(reg::NR23, reg::NR24, "C-4")); // Next row: base restored.
+}
+
+TEST(
+    Player,
+    ArpeggioWritesOnlyWhenThePitchChanges)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 040\n", "06"), 7);
+    EXPECT_EQ(frames[2], pitch(reg::NR23, reg::NR24, "E-4"));
+    EXPECT_EQ(frames[3], pitch(reg::NR23, reg::NR24, "C-4")); // y = 0: the base.
+    EXPECT_TRUE(frames[4].empty()); // Base again: no change.
+    EXPECT_EQ(frames[5], pitch(reg::NR23, reg::NR24, "E-4"));
+}
+
+TEST(
+    Player,
+    ArpeggioWithoutANoteUsesTheLastNote)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 ...\n01 --- . 047\n", "04"), 9);
+    EXPECT_TRUE(frames[5].empty()); // Row tick: already the base.
+    EXPECT_EQ(frames[6], pitch(reg::NR23, reg::NR24, "E-4"));
+    EXPECT_EQ(frames[7], pitch(reg::NR23, reg::NR24, "G-4"));
+    EXPECT_EQ(frames[8], pitch(reg::NR23, reg::NR24, "C-4"));
+}
+
+TEST(
+    Player,
+    ArpeggioBeforeAnyNoteDoesNothing)
+{
+    const auto frames = frames_of(on_channel(2, "00 --- . 047\n", "04"), 5);
+    for (std::size_t frame = 1; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
+}
+
+TEST(
+    Player,
+    ArpeggioClampsToB7)
+{
+    const auto frames = frames_of(on_channel(2, "00 A-7 2 0F0\n", "04"), 4);
+    EXPECT_EQ(frames[2], pitch(reg::NR23, reg::NR24, "B-7"));
+    EXPECT_EQ(frames[3], pitch(reg::NR23, reg::NR24, "A-7"));
+}
+
+TEST(
+    Player,
+    ArpeggioKeepsTheLengthBit)
+{
+    const auto frames = frames_of(on_channel(1, "00 C-4 1 047\n", "04"), 3); // Length on.
+    EXPECT_EQ(frames[2], pitch(reg::NR13, reg::NR14, "E-4", 0x40));
+}
+
+TEST(
+    Player,
+    RestoreComesBeforeTheNextRowsWrites)
+{
+    // Row 1's C retriggers from the base: the base pitch is written back first.
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 047\n01 --- . C80\n", "03"), 5);
+    EXPECT_EQ(
+        frames[4],
+        concat({pitch(reg::NR23, reg::NR24, "C-4"), {{reg::NR22, 0x80}, {reg::NR24, 0x86}}}));
+}
+
+TEST(
+    Player,
+    NoRestoreWhenTheNextRowTriggers)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 047\n01 E-4 . ...\n", "03"), 5);
+    EXPECT_EQ(frames[4].size(), 4u); // Only the trigger.
+    EXPECT_EQ(frames[4][0], (ApuWrite {reg::NR21, 0xC0}));
+}
+
+TEST(
+    Player,
+    RestoreBeforeADelayedNote)
+{
+    const auto frames = frames_of(on_channel(2, "00 C-4 2 047\n01 E-4 . 701\n", "03"), 6);
+    EXPECT_EQ(frames[4], pitch(reg::NR23, reg::NR24, "C-4"));
+    EXPECT_EQ(frames[5].size(), 4u); // The delayed trigger.
+}
+
+TEST(
+    Player,
+    ArpeggioOnTheWaveChannel)
+{
+    const auto frames = frames_of(on_channel(3, "00 C-4 1 047\n", "04"), 3);
+    EXPECT_EQ(frames[2], pitch(reg::NR33, reg::NR34, "E-4", 0x40)); // Instrument 1: length on.
+}
+
+TEST(
+    Player,
+    ArpeggioIsIgnoredOnTheNoiseChannel)
+{
+    const auto frames = frames_of(on_channel(4, "00 C-4 1 047\n", "04"), 5);
+    for (std::size_t frame = 2; frame < 5; ++frame) {
+        EXPECT_TRUE(frames[frame].empty()) << frame;
+    }
 }
 
 // --- Flow control ---
