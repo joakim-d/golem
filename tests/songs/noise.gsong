@@ -1,0 +1,28 @@
+# Driver step 4: the noise channel. Both LFSR widths, the lowest and highest notes,
+# instruments with and without length enable, an instrument kept across rows, C without a
+# note, and two orders with the loop.
+ticks_per_row 04
+
+noise 1 00 F1               # 15-bit LFSR, no length
+noise 2 C5 B2               # 7-bit LFSR, length 05 enabled
+noise 3 3F 82               # 15-bit LFSR, length 3F not enabled
+
+order 00 00 00 01
+order 00 00 00 02
+
+pattern 00
+
+pattern 01                  # order 0
+00 C-2 1 ...                # lowest note
+04 B-7 . ...                # highest note, instrument 1 kept
+08 --- . C00                # volume 0 and retrigger
+0C F#4 2 ...
+10 --- . C91                # retrigger keeps the length enable of instrument 2
+14 A-4 3 ...
+20 C-5 . ...
+
+pattern 02                  # order 1
+00 D-3 2 ...
+08 E-6 1 ...
+10 --- . C00
+18 G-2 3 ...

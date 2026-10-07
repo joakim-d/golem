@@ -74,5 +74,8 @@ golem_driver_test(silence) # Step 0
 golem_driver_test(scale) # Step 1
 golem_driver_test(pulses) # Step 2
 golem_driver_test(wave) # Step 3
+golem_driver_test(noise) # Step 4
+golem_driver_test(minimal) # Step 4
+golem_driver_test(instruments) # Step 4
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})

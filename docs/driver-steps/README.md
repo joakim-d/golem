@@ -8,7 +8,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [01](01-pulse1-scale.md) | Channel 1: notes, instruments, rows, orders, note off (`C`) | `driver.scale` | Done |
 | [02](02-pulse2.md) | Channel 2, per-channel state | `driver.pulses` | Done |
 | [03](03-wave.md) | Channel 3 and wave loading | `driver.wave` | Done |
-| [04](04-noise.md) | Channel 4 and the noise table | `driver.noise`, `driver.minimal`, `driver.instruments` | To do |
+| [04](04-noise.md) | Channel 4 and the noise table | `driver.noise`, `driver.minimal`, `driver.instruments` | Done |
 | [05](05-flow.md) | Tempo (F), position jump (B), pattern break (D) | `driver.flow` | To do |
 | [06](06-register-effects.md) | Effects 5, 6, 8, 9, C on every channel, folded triggers | `driver.registers` | To do |
 | [07](07-budgets.md) | Cycle and size budgets enforced by the tests | Budget tests | To do |

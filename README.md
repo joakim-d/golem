@@ -29,7 +29,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Reference player: effects 0–4, 7, A, E | To do |
 | Trace tools (`golem-trace`, `golem-tracediff`) and golden traces | Done |
 | Emulator harness (`golem-run`, Peanut-GB) and driver test ROMs | Done |
-| Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Step 3 of 7: channels 1–3 |
+| Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Step 4 of 7: all four channels |
 | Cycle and size budgets | To do |
 | Editor, WAV export | To do |
 
