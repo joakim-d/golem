@@ -28,8 +28,9 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Reference player: notes, instruments, effects 5 6 8 9 B C D F | Done |
 | Reference player: effects 0–4, 7, A, E | To do |
 | Trace tools (`golem-trace`, `golem-tracediff`) and golden traces | Done |
-| Sound driver (RGBDS) | Minimal ROM skeleton only |
-| Emulator harness, cycle and size budgets | To do |
+| Emulator harness (`golem-run`, Peanut-GB) and driver test ROMs | Done |
+| Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Step 1 of 7: channel 1 |
+| Cycle and size budgets | To do |
 | Editor, WAV export | To do |
 
 ## Layout
@@ -37,9 +38,9 @@ In Golem, the definition of correct behaviour exists before the driver code that
 ```
 core/         C++ library: song format, reference player, traces (+ unit tests)
 driver/       Game Boy sound driver, RGBDS assembly
-tools/        Command-line tools (golem-trace, golem-tracediff)
+tools/        Command-line tools (golem-trace, golem-tracediff, golem-run, golem-encode)
 tests/songs/  Test songs (.gsong) and their golden traces (.trace)
-docs/         Song format and driver contract
+docs/         Song format, driver contract, driver steps
 cmake/        CMake helpers (dependency fetching, GoogleTest)
 ```
 

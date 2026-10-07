@@ -4,6 +4,19 @@ What the sound driver must write to the APU, frame by frame, for a song in the f
 
 The executable definition is the reference player in `core/` (`golem::Player`, [core/src/player.cpp](../core/src/player.cpp)). The driver is correct when its APU trace equals the reference player's trace (see [Traces](#traces)). If this document and the reference player disagree, one of them has a bug, and it must be fixed before either is trusted.
 
+## Driver interface
+
+The driver ([driver/golem.inc](../driver/golem.inc)) has two entry points:
+
+- **`GolemInit`**: `hl` = address of the song. Starts the song at order 0, row 0 and makes the frame 0 writes.
+- **`GolemPlay`**: plays one frame. Called once per frame (VBlank) after `GolemInit`.
+
+Both clobber `af`, `bc`, `de` and `hl`.
+
+- **The song must stay mapped** at the address it was encoded for (binary song pointers are absolute).
+- **State:** the driver keeps its state in WRAM0.
+- **No APU reads:** the driver never reads APU registers. Their read values differ from what was written, and the test harness does not emulate them.
+
 ## Frames
 
 - **Frame 0** is the `init` call. It writes, in order: `NR52=$80`, `NR50=$77`, `NR51=$FF`.
@@ -108,3 +121,12 @@ The header gives the number of frames. Each following line is one write: `<frame
 **Pass criterion:** for every frame, the driver's writes are the same registers with the same values in the same order, and the traces cover the same number of frames. `golem-tracediff` reports the first difference, for example `frame 212: write #2: expected NR22=F3, got NR22=F1`.
 
 Golden traces for the songs in `tests/songs/` are produced by the reference player.
+
+### Test harness
+
+`golem-run` produces the driver's trace by running a test ROM ([driver/test_rom.asm](../driver/test_rom.asm)) headless and logging every write to `$FF10`–`$FF3F`.
+
+- **Frame markers:** the test ROM marks frames itself by writing to the unused address `$FF15`, once before `GolemInit` (frame 0) and once before each `GolemPlay` call. So trace frames match the driver's calls, whatever the emulator's timing.
+- **Ignored writes:** writes before the first marker, and the markers themselves.
+
+The plan for growing the driver, step by step, is in [driver-steps/](driver-steps/README.md).

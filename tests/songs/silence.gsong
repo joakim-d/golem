@@ -1,0 +1,6 @@
+# Driver step 0: an empty song. Only the init writes of frame 0 are expected.
+ticks_per_row 06
+
+order 00 00 00 00
+
+pattern 00

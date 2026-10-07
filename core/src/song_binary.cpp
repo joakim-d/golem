@@ -1,6 +1,5 @@
 #include "golem/song_binary.h"
 
-#include <algorithm>
 #include <map>
 #include <string>
 
@@ -108,7 +107,10 @@ namespace {
             const char* what) const
         {
             const auto start = offset(address, N, what);
-            std::copy_n(bytes_.begin() + start, N, values.begin());
+            // A plain loop: std::copy_n here trips a GCC 13 -Wstringop-overflow false positive.
+            for (std::size_t i = 0; i < N; ++i) {
+                values[i] = bytes_[start + i];
+            }
         }
 
     private:
