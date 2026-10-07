@@ -128,5 +128,6 @@ Golden traces for the songs in `tests/songs/` are produced by the reference play
 
 - **Frame markers:** the test ROM marks frames itself by writing to the unused address `$FF15`, once before `GolemInit` (frame 0) and once before each `GolemPlay` call. So trace frames match the driver's calls, whatever the emulator's timing.
 - **Ignored writes:** writes before the first marker, and the markers themselves.
+- **Timing:** the test ROM also writes to the unused address `$FF27` right after `GolemInit` and after each `GolemPlay` returns. `golem-run` times each driver call between the two markers. The budgets are in [driver-steps/07-budgets.md](driver-steps/07-budgets.md).
 
 The plan for growing the driver, step by step, is in [driver-steps/](driver-steps/README.md).

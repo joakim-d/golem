@@ -12,26 +12,40 @@ namespace {
     constexpr std::size_t kMinRomSize = 0x150; // Up to the end of the cartridge header.
 
     struct Recorder {
-        Trace* trace;
+        RunResult* result;
         std::int64_t frame = -1; // -1 until the first marker.
+        std::uint16_t frame_start = 0; // Clock at the current frame's marker.
         bool done = false;
     };
 
     void record(
         void* user,
         std::uint16_t address,
-        std::uint8_t value)
+        std::uint8_t value,
+        std::uint16_t clock)
     {
         auto& recorder = *static_cast<Recorder*>(user);
         if (recorder.done) {
             return;
         }
         if (address == kFrameMarker) {
-            recorder.done = ++recorder.frame == recorder.trace->frames;
+            recorder.frame_start = clock;
+            recorder.done = ++recorder.frame == recorder.result->trace.frames;
+            return;
+        }
+        if (address == kCallEndMarker) {
+            // The first end marker of a frame closes the measured call.
+            if (recorder.frame >= 0) {
+                auto& cycles = recorder.result->frame_cycles[recorder.frame];
+                if (!cycles) {
+                    const auto elapsed = static_cast<std::uint16_t>(clock - recorder.frame_start);
+                    cycles = elapsed - kMarkerCycles;
+                }
+            }
             return;
         }
         if (recorder.frame >= 0) {
-            recorder.trace->entries.push_back(
+            recorder.result->trace.entries.push_back(
                 {static_cast<std::uint32_t>(recorder.frame), {address, value}});
         }
     }
@@ -45,20 +59,21 @@ namespace {
 
 } // namespace
 
-Trace run_rom(
+RunResult run_rom(
     const std::vector<std::uint8_t>& rom,
     std::uint32_t frames)
 {
-    Trace trace;
-    trace.frames = frames;
+    RunResult result;
+    result.trace.frames = frames;
     if (frames == 0) {
-        return trace;
+        return result;
     }
+    result.frame_cycles.resize(frames);
     if (rom.size() < kMinRomSize) {
         throw RunError("ROM is smaller than its header");
     }
 
-    Recorder recorder {&trace};
+    Recorder recorder {&result};
     const char* error = nullptr;
     std::unique_ptr<golem_gb, Destroy> gb(
         golem_gb_create(rom.data(), rom.size(), record, &recorder, &error));
@@ -83,7 +98,7 @@ Trace run_rom(
             + std::to_string(limit)
             + " emulator frames");
     }
-    return trace;
+    return result;
 }
 
 } // namespace golem
