@@ -1,5 +1,11 @@
 # Driver test ROMs: the driver, the test ROM shell and one song each, checked by golem-run
-# against the song's golden trace (ctest -R driver).
+# against the song's golden trace and the cycle budget, plus a size check (ctest -R driver).
+
+# Budgets (docs/driver-steps/07-budgets.md): T-cycles per GolemPlay call, and bytes of the
+# driver's ROM section ("Golem driver") and WRAM section ("Golem state").
+set(GOLEM_DRIVER_MAX_PLAY_CYCLES 14000)
+set(GOLEM_DRIVER_MAX_ROM_BYTES 2048)
+set(GOLEM_DRIVER_MAX_WRAM_BYTES 64)
 
 find_program(RGBASM rgbasm)
 find_program(RGBLINK rgblink)
@@ -37,13 +43,15 @@ add_custom_command(
 set(GOLEM_DRIVER_ROMS)
 
 # golem_driver_test(<song>): builds <song>.gb from tests/songs/<song>.gsong and adds the
-# test driver.<song>, which compares its APU trace with tests/songs/<song>.trace.
+# test driver.<song>, which compares its APU trace with tests/songs/<song>.trace and checks
+# every GolemPlay call against the cycle budget.
 function(golem_driver_test song)
   set(gsong ${PROJECT_SOURCE_DIR}/tests/songs/${song}.gsong)
   set(golden ${PROJECT_SOURCE_DIR}/tests/songs/${song}.trace)
   set(bin ${DRIVER_BINARY_DIR}/${song}.bin)
   set(stub ${DRIVER_BINARY_DIR}/${song}_song.asm)
   set(rom ${DRIVER_BINARY_DIR}/${song}.gb)
+  set(map ${DRIVER_BINARY_DIR}/${song}.map)
 
   add_custom_command(
     OUTPUT ${bin}
@@ -60,13 +68,16 @@ function(golem_driver_test song)
 
   add_custom_command(
     OUTPUT ${rom}
-    COMMAND ${RGBLINK} -o ${rom} test_rom.o golem.o ${song}_song.o
+    BYPRODUCTS ${map}
+    COMMAND ${RGBLINK} -o ${rom} -m ${map} test_rom.o golem.o ${song}_song.o
     COMMAND ${RGBFIX} -v -p 0xFF -t GOLEMTEST ${rom}
     DEPENDS test_rom.o golem.o ${song}_song.o
     COMMENT "Linking ${song}.gb")
 
   set(GOLEM_DRIVER_ROMS ${GOLEM_DRIVER_ROMS} ${rom} PARENT_SCOPE)
-  add_test(NAME driver.${song} COMMAND golem-run ${rom} --expect ${golden})
+  add_test(NAME driver.${song}
+    COMMAND golem-run ${rom} --expect ${golden} --cycles
+      --max-cycles ${GOLEM_DRIVER_MAX_PLAY_CYCLES})
 endfunction()
 
 # One test per step of docs/driver-steps/: every song listed here must match its trace.
@@ -83,3 +94,9 @@ golem_driver_test(registers) # Step 6
 golem_driver_test(effects) # Step 6
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
+
+# The driver sections are the same in every test ROM: check them in one map file.
+add_test(NAME driver.size
+  COMMAND ${CMAKE_COMMAND} -DMAP=${DRIVER_BINARY_DIR}/silence.map
+    -DMAX_ROM=${GOLEM_DRIVER_MAX_ROM_BYTES} -DMAX_WRAM=${GOLEM_DRIVER_MAX_WRAM_BYTES}
+    -P ${DRIVER_SOURCE_DIR}/check_size.cmake)

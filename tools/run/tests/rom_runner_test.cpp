@@ -29,6 +29,17 @@ public:
         return *this;
     }
 
+    // Writes `bytes` at `address`, independently of the code cursor.
+    RomBuilder& at(
+        std::uint16_t address,
+        std::initializer_list<std::uint8_t> bytes)
+    {
+        for (auto byte : bytes) {
+            rom_[address++] = byte;
+        }
+        return *this;
+    }
+
     std::uint16_t pc() const
     {
         return pc_;
@@ -53,6 +64,7 @@ private:
 constexpr std::uint8_t kLdA = 0x3E; // ld a, n
 constexpr std::uint8_t kLdh = 0xE0; // ldh [$FF00 + n], a
 constexpr std::uint8_t kMarker = kFrameMarker & 0xFF;
+constexpr std::uint8_t kEndMarker = kCallEndMarker & 0xFF;
 
 // Writes NR52 before the first marker, NR50 in frame 0, then waits for VBlank and writes
 // a marker and NR51 = frame number in every following frame.
@@ -81,7 +93,7 @@ TEST(
     RomRunner,
     SplitsWritesIntoFramesAtMarkers)
 {
-    const Trace trace = run_rom(counting_rom(), 4);
+    const Trace trace = run_rom(counting_rom(), 4).trace;
     EXPECT_EQ(
         trace,
         make_trace({
@@ -96,7 +108,9 @@ TEST(
     RomRunner,
     ZeroFramesIsAnEmptyTrace)
 {
-    EXPECT_EQ(run_rom(counting_rom(), 0), Trace {});
+    const auto result = run_rom(counting_rom(), 0);
+    EXPECT_EQ(result.trace, Trace {});
+    EXPECT_TRUE(result.frame_cycles.empty());
 }
 
 TEST(
@@ -116,4 +130,39 @@ TEST(
     rom[0x14D] ^= 0xFF; // Header checksum.
     EXPECT_THROW(run_rom(rom, 1), RunError);
     EXPECT_THROW(run_rom(std::vector<std::uint8_t>(0x100), 1), RunError);
+}
+
+TEST(
+    RomRunner,
+    FramesWithoutEndMarkerHaveNoCycles)
+{
+    const auto cycles = run_rom(counting_rom(), 4).frame_cycles;
+    ASSERT_EQ(cycles.size(), 4u);
+    for (const auto& frame : cycles) {
+        EXPECT_EQ(frame, std::nullopt);
+    }
+}
+
+TEST(
+    RomRunner,
+    MeasuresCyclesFromFrameMarkerToEndMarker)
+{
+    RomBuilder rom;
+    rom.at(0x0200, {0x00, 0xC9}) // Subroutine: nop (4), ret (16).
+        .code({kLdh, kMarker}) // Frame 0
+        .code({0x00, 0x00, 0x00}) // 3 x nop: 12 cycles
+        .code({kLdh, kEndMarker})
+        .code({kLdh, kMarker}) // Frame 1
+        .code({0xCD, 0x00, 0x02}) // call $0200: 24 + 4 + 16 = 44 cycles
+        .code({kLdh, kEndMarker})
+        .code({kLdh, kMarker}) // Frame 2: no end marker
+        .code({0x00})
+        .code({kLdh, kMarker}) // Frame 3 completes frame 2
+        .code({0x18, 0xFE}); // jr to itself
+    const auto result = run_rom(rom.build(), 3);
+    EXPECT_EQ(result.trace, make_trace({{}, {}, {}})); // Markers are not APU writes.
+    ASSERT_EQ(result.frame_cycles.size(), 3u);
+    EXPECT_EQ(result.frame_cycles[0], 12u);
+    EXPECT_EQ(result.frame_cycles[1], 44u);
+    EXPECT_EQ(result.frame_cycles[2], std::nullopt);
 }

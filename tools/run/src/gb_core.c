@@ -32,7 +32,11 @@ static void audio_write(uint16_t address, uint8_t value)
 {
     /* gb_reset() writes the post-boot APU state outside of a frame: not a program write. */
     if (current != NULL) {
-        current->on_write(current->user, address, value);
+        /* Peanut-GB adds an instruction's cycles after running it: this is the time before
+         * the instruction making the write. */
+        const uint16_t clock
+            = (uint16_t)((current->gb.hram_io[IO_DIV] << 8) | current->gb.counter.div_count);
+        current->on_write(current->user, address, value, clock);
     }
 }
 

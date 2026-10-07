@@ -1,5 +1,5 @@
 /* Minimal C interface to the Peanut-GB emulator: runs a ROM-only cartridge headless and
- * reports every write to the APU registers ($FF10-$FF3F). */
+ * reports every write to the APU registers ($FF10-$FF3F) with the time it happened. */
 #ifndef GOLEM_GB_CORE_H
 #define GOLEM_GB_CORE_H
 
@@ -10,10 +10,13 @@
 extern "C" {
 #endif
 
+/* `clock` counts T-cycles modulo 65536 (DIV << 8 | sub-DIV count) and reads the time before
+ * the instruction making the write. */
 typedef void (*golem_gb_write_fn)(
     void* user,
     uint16_t address,
-    uint8_t value);
+    uint8_t value,
+    uint16_t clock);
 
 typedef struct golem_gb golem_gb;
 
