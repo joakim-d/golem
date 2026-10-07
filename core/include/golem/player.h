@@ -12,12 +12,6 @@
 
 namespace golem {
 
-// Thrown when the song uses an effect the reference player does not implement yet.
-class UnsupportedEffect : public std::runtime_error {
-public:
-    using std::runtime_error::runtime_error;
-};
-
 // Reference player: the definition of what the driver writes to the APU, frame by frame.
 // See docs/driver-contract.md. It is deterministic and reads no input besides the song.
 class Player {
@@ -45,6 +39,7 @@ private:
         std::optional<int> portamento; // Period change per tick of the row's 1 (+) or 2 (-).
         std::optional<std::uint16_t> target; // Period a 3 slides toward, until the next note.
         std::optional<std::uint8_t> tone_portamento; // Step per tick of the row's 3.
+        std::optional<std::uint8_t> vibrato; // Parameter of the current row's 4.
     };
 
     // Effect 9 and C values folded into a trigger on the same row.
@@ -88,6 +83,10 @@ private:
     // One non-row tick of 3: the channel's period moves toward its target by the step,
     // without passing it; written like a portamento step on a change.
     void tone_portamento_step(std::size_t channel);
+    // One non-row tick t of 4 xy: the channel's period + y for t = 1..x of the row, - y for
+    // the next x ticks, and so on (x = 0 counts as 1), clamped to the note table; writes
+    // the pitch (not the period) on a change, like an arpeggio step.
+    void vibrato_step(std::size_t channel);
     // True if the cell's note triggers on the row tick: not delayed by 7, and not a 3
     // target on a channel that already plays a note.
     bool triggers_on_row_tick(

@@ -19,6 +19,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [12](12-arpeggio.md) | Arpeggio (0), the first pitch effect | `driver.arpeggio` | Done |
 | [13](13-portamento.md) | Portamento up and down (1, 2) | `driver.portamento` | Done |
 | [14](14-tone-portamento.md) | Tone portamento (3) | `driver.tone` | Done |
+| [15](15-vibrato.md) | Vibrato (4), the last effect | `driver.vibrato` | Done |
 
 ## Rules for every step
 
@@ -27,8 +28,6 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 - **Registering a test.** A song becomes a driver test by adding `golem_driver_test(<song>)` to [driver/CMakeLists.txt](../../driver/CMakeLists.txt). Only songs the driver fully supports are registered.
 - **TDD.** Interface first, then register the failing test, then implement until the trace matches.
 
-## Later steps (oracle first)
+## After step 15
 
-These effects are not specified yet. For each one, the contract, the reference player and a golden trace come first, then the driver step:
-
-- 4 (vibrato)
+Every effect of the song format (0–F) is specified in the contract, implemented in the reference player and in the driver, and covered by a golden song. New behaviour still follows the same order: contract, reference player and golden trace first, then a driver step.
