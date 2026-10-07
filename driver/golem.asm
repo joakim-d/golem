@@ -1,5 +1,5 @@
 ; Golem sound driver. Interface: golem.inc. Behaviour: docs/driver-contract.md.
-; Current scope: docs/driver-steps/ (step 3, channels 1 to 3).
+; Current scope: docs/driver-steps/ (step 4, all four channels).
 
 INCLUDE "apu.inc"
 INCLUDE "golem.inc"
@@ -10,11 +10,12 @@ DEF HDR_ORDER_COUNT EQU 1
 DEF HDR_ORDER_TABLES EQU 3 ; One pointer per channel.
 DEF HDR_PULSE_INSTRUMENTS EQU 11
 DEF HDR_WAVE_INSTRUMENTS EQU 13
+DEF HDR_NOISE_INSTRUMENTS EQU 15
 DEF HDR_WAVES EQU 17
 
 DEF CHANNELS EQU 4
-DEF PLAYED_CHANNELS EQU 3 ; Channels the driver plays so far: 1 to 3.
 DEF WAVE_CHANNEL EQU 2 ; 0-based
+DEF NOISE_CHANNEL EQU 3
 DEF ROWS_PER_PATTERN EQU 64
 DEF EFFECT_SET_VOLUME EQU $C
 DEF WAVE_BYTES EQU 16
@@ -125,7 +126,7 @@ PlayRow:
 	call PlayCell
 	ld a, [wChannel]
 	inc a
-	cp PLAYED_CHANNELS
+	cp CHANNELS
 	jr nz, .channel
 	ret
 
@@ -168,6 +169,8 @@ PlayCell:
 	ld a, [wChannel]
 	cp WAVE_CHANNEL
 	jr z, PlayWaveCell
+	cp NOISE_CHANNEL
+	jp z, PlayNoiseCell
 	ld a, b
 	and a
 	jp nz, TriggerPulse
@@ -211,7 +214,8 @@ PlayWaveCell:
 ; Triggers the wave channel with the note in b and its current instrument.
 TriggerWave:
 	call SetNotePeriod
-	call WaveInstrument
+	ld a, HDR_WAVE_INSTRUMENTS
+	call TwoByteInstrument
 	push hl
 	inc hl
 	ld a, [hl] ; Byte 1, bits 3-0: wave index.
@@ -266,16 +270,74 @@ LoadWave:
 	jr nz, .byte
 	ret
 
-; Out: hl = current wave instrument of the wave channel (2 bytes). Clobbers af, de.
-WaveInstrument:
+; Plays the current row of the noise channel: b = note, c = instrument << 4 | effect,
+; e = effect parameter.
+PlayNoiseCell:
+	ld a, b
+	and a
+	jr nz, TriggerNoise
+
+	ld a, c
+	and $0F
+	cp EFFECT_SET_VOLUME
+	ret nz
+	; Set volume without a note: NR42 = xx, then retrigger.
+	ld a, e
+	ldh [rNR42], a
+	ld a, HDR_NOISE_INSTRUMENTS
+	call TwoByteInstrument
+	ld a, [hl]
+	and $40 ; Length enable, already at its NR44 position.
+	or $80
+	ldh [rNR44], a
+	ret
+
+; Triggers the noise channel with the note in b and its current instrument.
+TriggerNoise:
+	ld a, HDR_NOISE_INSTRUMENTS
+	call TwoByteInstrument
+	ld a, [hl+]
+	ld d, a ; Byte 0: LFSR width, length enable, length timer.
+	and $3F
+	ldh [rNR41], a
+	ld a, [hl]
+	ldh [rNR42], a
+
+	ld a, b
+	dec a
+	ld l, a
+	ld h, 0
+	push de
+	ld de, NoiseNr43
+	add hl, de
+	pop de
+	ld a, d
+	and $80 ; 7-bit LFSR: bit 7 to NR43 bit 3.
+	rrca
+	rrca
+	rrca
+	rrca
+	or [hl]
+	ldh [rNR43], a
+
+	ld a, d
+	and $40 ; Length enable, already at its NR44 position.
+	or $80
+	ldh [rNR44], a
+	ret
+
+; In: a = header offset of a table of 2-byte instruments (wave or noise).
+; Out: hl = current instrument of channel wChannel in that table. Clobbers af, de.
+TwoByteInstrument:
+	push af
 	call ChannelState
 	ld a, [hl] ; CHANNEL_INSTRUMENT
 	dec a
 	add a
 	ld e, a
 	ld d, 0
+	pop af
 	push de
-	ld a, HDR_WAVE_INSTRUMENTS
 	call SongHeaderWord
 	pop de
 	add hl, de
