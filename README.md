@@ -17,7 +17,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
    frame 212: write #2: expected NR22=F3, got NR22=F1
    ```
 
-3. WAV rendering is planned, but only as a check for human ears. It will never decide whether a test passes.
+3. WAV rendering, through SameBoy's sound emulation, lets you listen to the songs. It is a check for human ears only: it never decides whether a test passes.
 
 ## Status
 
@@ -32,7 +32,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 3 KiB, WRAM ≤ 128 B) | Done |
 | Cross-check in SameBoy (identical traces and cycles) | Done |
 | WAV rendering through SameBoy's sound emulation (`golem-wav`, `driver-wavs`), for listening | Done |
-| Editor, WAV export | To do |
+| Editor | To do |
 
 ## Layout
 
