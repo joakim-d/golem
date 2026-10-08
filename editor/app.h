@@ -42,6 +42,18 @@ private:
         SaveAs,
     };
 
+    enum class SideTab {
+        Orders,
+        Instruments,
+        Waves,
+    };
+
+    enum class InstrumentType {
+        Pulse,
+        Wave,
+        Noise,
+    };
+
     // Runs `action` now, or after asking about unsaved changes.
     void request(Pending action);
     void run(Pending action);
@@ -60,7 +72,14 @@ private:
 
     void draw_menu();
     void draw_toolbar();
+    void draw_side_panel();
     void draw_orders();
+    void draw_instruments();
+    void draw_pulse_instrument();
+    void draw_wave_instrument();
+    void draw_noise_instrument();
+    void draw_waves();
+    void draw_wave_canvas();
     void draw_pattern();
     void draw_popups();
     void update_title();
@@ -77,6 +96,14 @@ private:
     std::string title_;
     std::uint8_t ticks_edit_ = 6;
     bool ticks_editing_ = false;
+
+    std::optional<SideTab> select_tab_; // Opened by the next frame, e.g. from a button.
+    InstrumentType instrument_type_ = InstrumentType::Pulse;
+    int wave_ = 0; // Shown in the Waves tab.
+    std::optional<std::pair<int, int>> last_drawn_; // Sample and value under the mouse.
+    char wave_hex_edit_[48] = {};
+    bool wave_hex_editing_ = false;
+    bool wave_hex_invalid_ = false;
 
     // Results of SDL's file dialogs, which may arrive on another thread.
     std::mutex dialog_mutex_;

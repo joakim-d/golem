@@ -1,6 +1,7 @@
 add_executable(golem_core_tests
   apu_test.cpp
   edit_test.cpp
+  instrument_fields_test.cpp
   golden_test.cpp
   notes_test.cpp
   player_test.cpp

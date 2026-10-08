@@ -1,5 +1,6 @@
 #include "golem/edit.h"
 
+#include "golem/instrument_fields.h"
 #include "golem/song_text.h"
 
 #include <gtest/gtest.h>
@@ -443,6 +444,171 @@ TEST(
     EXPECT_TRUE(doc.modified()); // Different from what was saved.
     doc.redo();
     EXPECT_FALSE(doc.modified());
+}
+
+// --- Instruments and waves ---
+
+TEST(
+    Edit,
+    SetInstrumentsIsAChange)
+{
+    Document doc;
+    const Song original = doc.song();
+    doc.set_pulse_instrument(2, PulseInstrument {{0x00, 0x40, 0xA1}});
+    doc.set_wave_instrument(3, WaveInstrument {{0x10, 0x41}});
+    doc.set_noise_instrument(15, NoiseInstrument {{0x80, 0x71}});
+    EXPECT_EQ(
+        doc.song().pulse_instruments[1].bytes, (std::array<std::uint8_t, 3> {0x00, 0x40, 0xA1}));
+    EXPECT_EQ(doc.song().wave_instruments[2].bytes, (std::array<std::uint8_t, 2> {0x10, 0x41}));
+    EXPECT_EQ(doc.song().noise_instruments[14].bytes, (std::array<std::uint8_t, 2> {0x80, 0x71}));
+    EXPECT_TRUE(doc.modified());
+    doc.undo();
+    doc.undo();
+    doc.undo();
+    EXPECT_EQ(doc.song(), original);
+    EXPECT_FALSE(doc.modified());
+    EXPECT_FALSE(doc.can_undo());
+}
+
+TEST(
+    Edit,
+    SetWavesIsAChange)
+{
+    Document doc;
+    const Wave saw = wave_preset(WavePreset::Saw);
+    doc.set_wave(4, saw);
+    EXPECT_EQ(doc.song().waves[4], saw);
+    doc.set_wave_sample(5, 0, 0xF); // High nibble of byte 0.
+    doc.set_wave_sample(5, 1, 0x3); // Low nibble.
+    doc.set_wave_sample(5, 31, 0x1C); // Masked to C.
+    EXPECT_EQ(doc.song().waves[5][0], 0xF3);
+    EXPECT_EQ(doc.song().waves[5][15], 0x0C);
+    EXPECT_TRUE(doc.modified());
+}
+
+TEST(
+    Edit,
+    InstrumentAndWaveNumbersAreClamped)
+{
+    Document doc;
+    doc.set_pulse_instrument(0, PulseInstrument {{0x00, 0x00, 0x11}}); // Instrument 1
+    doc.set_pulse_instrument(20, PulseInstrument {{0x00, 0x00, 0x22}}); // Instrument 15
+    doc.set_wave(16, wave_preset(WavePreset::Square)); // Wave 15
+    doc.set_wave_sample(0, 40, 0x5); // Sample 31
+    EXPECT_EQ(doc.song().pulse_instruments[0].bytes[2], 0x11);
+    EXPECT_EQ(doc.song().pulse_instruments[14].bytes[2], 0x22);
+    EXPECT_EQ(doc.song().waves[15], wave_preset(WavePreset::Square));
+    EXPECT_EQ(wave_sample(doc.song().waves[0], 31), 0x5);
+}
+
+TEST(
+    Edit,
+    SettingTheCurrentValueChangesNothing)
+{
+    Document doc;
+    doc.set_pulse_instrument(1, doc.song().pulse_instruments[0]);
+    doc.set_wave_instrument(1, doc.song().wave_instruments[0]);
+    doc.set_noise_instrument(1, doc.song().noise_instruments[0]);
+    doc.set_wave(0, doc.song().waves[0]);
+    doc.set_wave_sample(0, 3, wave_sample(doc.song().waves[0], 3));
+    EXPECT_FALSE(doc.modified());
+    EXPECT_FALSE(doc.can_undo());
+}
+
+TEST(
+    Edit,
+    ChangesToTheSameInstrumentAreOneUndoStep)
+{
+    Document doc;
+    const Song original = doc.song();
+    for (std::uint8_t volume = 1; volume <= 8; ++volume) { // A slider being dragged.
+        doc.set_pulse_instrument(
+            1, PulseInstrument {{0x00, 0x80, static_cast<std::uint8_t>(volume << 4)}});
+    }
+    EXPECT_EQ(doc.song().pulse_instruments[0].bytes[2], 0x80);
+    doc.undo();
+    EXPECT_EQ(doc.song(), original);
+    EXPECT_FALSE(doc.can_undo());
+    doc.redo();
+    EXPECT_EQ(doc.song().pulse_instruments[0].bytes[2], 0x80);
+}
+
+TEST(
+    Edit,
+    ChangesToTheSameWaveAreOneUndoStep)
+{
+    Document doc;
+    const Song original = doc.song();
+    for (std::size_t index = 0; index < kWaveSamples; ++index) { // A wave being drawn.
+        doc.set_wave_sample(1, index, 0xF);
+    }
+    doc.set_wave(1, wave_preset(WavePreset::Sine));
+    doc.undo();
+    EXPECT_EQ(doc.song(), original);
+    EXPECT_FALSE(doc.can_undo());
+}
+
+TEST(
+    Edit,
+    FinishEditEndsAnUndoStep)
+{
+    Document doc;
+    doc.set_wave_sample(0, 0, 0x1);
+    doc.finish_edit();
+    doc.set_wave_sample(0, 0, 0x2);
+    doc.undo();
+    EXPECT_EQ(wave_sample(doc.song().waves[0], 0), 0x1);
+    doc.undo();
+    EXPECT_EQ(wave_sample(doc.song().waves[0], 0), 0x0);
+    EXPECT_FALSE(doc.can_undo());
+}
+
+TEST(
+    Edit,
+    AnotherTargetOrChangeEndsAnUndoStep)
+{
+    Document doc;
+    doc.set_pulse_instrument(1, PulseInstrument {{0x00, 0x00, 0x10}});
+    doc.set_pulse_instrument(2, PulseInstrument {{0x00, 0x00, 0x10}}); // Another instrument
+    doc.set_wave_instrument(2, WaveInstrument {{0x00, 0x40}}); // Same number, another type
+    doc.set_wave(2, wave_preset(WavePreset::Saw));
+    doc.enter_note(kC4); // Another kind of change
+    doc.set_wave(2, wave_preset(WavePreset::Square));
+    int steps = 0;
+    while (doc.can_undo()) {
+        doc.undo();
+        ++steps;
+    }
+    EXPECT_EQ(steps, 6);
+}
+
+TEST(
+    Edit,
+    UndoAndRedoEndAnUndoStep)
+{
+    Document doc;
+    doc.set_wave_sample(0, 0, 0x1);
+    doc.set_wave_sample(0, 0, 0x2);
+    doc.undo();
+    doc.redo();
+    doc.set_wave_sample(0, 0, 0x3); // A new step: undo goes back to 2, not to 0.
+    doc.undo();
+    EXPECT_EQ(wave_sample(doc.song().waves[0], 0), 0x2);
+}
+
+TEST(
+    Edit,
+    MergedChangesAfterASaveAreModified)
+{
+    TempFile file("merged.gsong");
+    Document doc;
+    doc.set_wave_sample(0, 0, 0x1);
+    doc.save_as(file.str());
+    EXPECT_FALSE(doc.modified());
+    doc.set_wave_sample(0, 0, 0x2); // Same undo step as before the save.
+    EXPECT_TRUE(doc.modified());
+    doc.undo();
+    EXPECT_TRUE(doc.modified()); // Back to the state before the step, not the saved one.
 }
 
 // --- Files ---

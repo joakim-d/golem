@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Editing model of the Golem editor: everything the editor does to a song, without UI.
@@ -104,6 +105,27 @@ public:
 
     void set_ticks_per_row(std::uint8_t ticks); // A change; 0 means 256.
 
+    // Instruments (1..15) and waves (0..15), clamped. Each is a change, unless the value is the
+    // current one. Consecutive changes to the same instrument or wave are one undo step, until
+    // finish_edit() or another kind of change: a slider drag or a wave drawing undoes at once.
+    void set_pulse_instrument(
+        std::uint8_t instrument,
+        const PulseInstrument& value);
+    void set_wave_instrument(
+        std::uint8_t instrument,
+        const WaveInstrument& value);
+    void set_noise_instrument(
+        std::uint8_t instrument,
+        const NoiseInstrument& value);
+    void set_wave(
+        std::uint8_t wave,
+        const Wave& value);
+    void set_wave_sample( // Sample 0..31 (clamped) set to 0..15 (masked).
+        std::uint8_t wave,
+        std::size_t index,
+        std::uint8_t sample);
+    void finish_edit(); // Ends the current undo step of instrument or wave changes.
+
     bool can_undo() const;
     bool can_redo() const;
     void undo(); // Restores the song and the cursor of before the last change.
@@ -116,7 +138,19 @@ private:
         std::uint64_t revision;
     };
 
+    // What a run of merged changes applies to: an instrument of one type, or a wave.
+    enum class Target {
+        Pulse,
+        WaveInstrument,
+        Noise,
+        Wave,
+    };
+
     void change(); // Records the current state for undo, before a change.
+    // Like change(), but continues the undo step of the previous change to the same target.
+    void merged_change(
+        Target target,
+        std::uint8_t index);
     Cell& cell_at_cursor();
     void advance();
 
@@ -131,6 +165,7 @@ private:
     std::uint64_t saved_revision_ = 0;
     std::vector<Snapshot> undo_;
     std::vector<Snapshot> redo_;
+    std::optional<std::pair<Target, std::uint8_t>> merging_;
 };
 
 } // namespace golem::edit

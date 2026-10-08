@@ -1,5 +1,6 @@
 #include "golem/edit.h"
 
+#include "golem/instrument_fields.h"
 #include "golem/notes.h"
 #include "golem/song_text.h"
 
@@ -28,24 +29,19 @@ namespace {
         song.pulse_instruments[0].bytes = {0x00, 0x80, 0xF0}; // 50% duty, volume F, held
         song.wave_instruments[0].bytes = {0x00, 0x20}; // Full volume, wave 0
         song.noise_instruments[0].bytes = {0x00, 0xF2}; // Volume F, fading like a drum
-        song.waves[0] = {
-            0x01,
-            0x23,
-            0x45,
-            0x67,
-            0x89,
-            0xAB,
-            0xCD,
-            0xEF,
-            0xFE,
-            0xDC,
-            0xBA,
-            0x98,
-            0x76,
-            0x54,
-            0x32,
-            0x10}; // Triangle
+        song.waves[0] = wave_preset(WavePreset::Triangle);
         return song;
+    }
+
+    std::uint8_t instrument_index(std::uint8_t instrument)
+    {
+        return static_cast<std::uint8_t>(
+            std::clamp<std::uint8_t>(instrument, 1, static_cast<std::uint8_t>(kInstruments)) - 1);
+    }
+
+    std::uint8_t wave_index(std::uint8_t wave)
+    {
+        return std::min<std::uint8_t>(wave, static_cast<std::uint8_t>(kWaves - 1));
     }
 
     int column_index(const Cursor& cursor)
@@ -365,6 +361,73 @@ void Document::set_ticks_per_row(std::uint8_t ticks)
     song_.ticks_per_row = ticks;
 }
 
+void Document::set_pulse_instrument(
+    std::uint8_t instrument,
+    const PulseInstrument& value)
+{
+    const std::uint8_t index = instrument_index(instrument);
+    if (song_.pulse_instruments[index].bytes == value.bytes) {
+        return;
+    }
+    merged_change(Target::Pulse, index);
+    song_.pulse_instruments[index] = value;
+}
+
+void Document::set_wave_instrument(
+    std::uint8_t instrument,
+    const WaveInstrument& value)
+{
+    const std::uint8_t index = instrument_index(instrument);
+    if (song_.wave_instruments[index].bytes == value.bytes) {
+        return;
+    }
+    merged_change(Target::WaveInstrument, index);
+    song_.wave_instruments[index] = value;
+}
+
+void Document::set_noise_instrument(
+    std::uint8_t instrument,
+    const NoiseInstrument& value)
+{
+    const std::uint8_t index = instrument_index(instrument);
+    if (song_.noise_instruments[index].bytes == value.bytes) {
+        return;
+    }
+    merged_change(Target::Noise, index);
+    song_.noise_instruments[index] = value;
+}
+
+void Document::set_wave(
+    std::uint8_t wave,
+    const Wave& value)
+{
+    const std::uint8_t index = wave_index(wave);
+    if (song_.waves[index] == value) {
+        return;
+    }
+    merged_change(Target::Wave, index);
+    song_.waves[index] = value;
+}
+
+void Document::set_wave_sample(
+    std::uint8_t wave,
+    std::size_t index,
+    std::uint8_t sample)
+{
+    index = std::min(index, kWaveSamples - 1);
+    Wave value = song_.waves[wave_index(wave)];
+    std::uint8_t& byte = value[index / 2];
+    sample &= 0x0F;
+    byte = static_cast<std::uint8_t>(
+        index % 2 == 0 ? (sample << 4 | (byte & 0x0F)) : ((byte & 0xF0) | sample));
+    set_wave(wave, value);
+}
+
+void Document::finish_edit()
+{
+    merging_.reset();
+}
+
 bool Document::can_undo() const
 {
     return !undo_.empty();
@@ -386,6 +449,7 @@ void Document::undo()
     cursor_ = previous.cursor;
     revision_ = previous.revision;
     undo_.pop_back();
+    merging_.reset();
 }
 
 void Document::redo()
@@ -399,6 +463,7 @@ void Document::redo()
     cursor_ = next.cursor;
     revision_ = next.revision;
     redo_.pop_back();
+    merging_.reset();
 }
 
 void Document::change()
@@ -406,6 +471,20 @@ void Document::change()
     undo_.push_back({song_, cursor_, revision_});
     redo_.clear();
     revision_ = next_revision_++;
+    merging_.reset();
+}
+
+void Document::merged_change(
+    Target target,
+    std::uint8_t index)
+{
+    const auto key = std::make_pair(target, index);
+    if (merging_ != key) {
+        change();
+        merging_ = key;
+    } else {
+        revision_ = next_revision_++; // Still a change for the modified flag.
+    }
 }
 
 Cell& Document::cell_at_cursor()
