@@ -21,12 +21,13 @@ In (`editor/`, SDL3 and Dear ImGui, both fetched with pinned versions):
 - **Title:** the file name, with `*` while there are unsaved changes.
 - **Audio:** an SDL audio stream fed by `LivePlayer`. Without playback in the build, Play is greyed out and its tooltip gives the reason.
 - **`GOLEM_EDITOR` option (on by default):** skips the editor and its dependencies when off.
+- **Headless runs:** `--quit-after-frames N` quits after N frames and `--play` starts playback, for the `editor.smoke` test (SDL's offscreen video and dummy audio). `--screenshot FILE.bmp` saves the last frame, so the window can be checked without a display.
 
 Out: everything in the later steps of the [index](README.md).
 
 ## Acceptance criteria
 
-- **The editor builds on every CI job.** Windows builds it without playback. It is not run in CI.
+- **The editor builds on every CI job,** and the `editor.smoke` test runs it headless there: it opens a song, starts playback and draws frames. Windows builds it without playback.
 - **Manual checklist**, on Linux with SameBoy:
   1. open `tests/songs/scale.gsong`;
   2. Play and hear the scale;

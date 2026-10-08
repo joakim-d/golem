@@ -6,7 +6,7 @@ The Golem editor is a desktop tracker (SDL3 and Dear ImGui) for writing songs in
 |---|---|---|---|
 | [00](00-editing-model.md) | Editing model in `core/`: document, cursor, note and hex entry, orders, undo/redo, open/save | `Edit.*` tests | Done |
 | [01](01-live-playback.md) | Player ROM template and `LivePlayer`: a song played by the driver in SameBoy, sample by sample | `LivePlayer.*` tests; golden songs patched into the template reproduce their golden traces | Done |
-| [02](02-editor-window.md) | The editor window: pattern grid, orders, toolbar, menus, audio, file dialogs | Builds on every CI job; manual checklist; [composer.md](../composer.md) user guide | To do |
+| [02](02-editor-window.md) | The editor window: pattern grid, orders, toolbar, menus, audio, file dialogs | Builds on every CI job; manual checklist; [composer.md](../composer.md) user guide | Built; manual checklist to do |
 
 Milestone 1 (edit, play, save) is steps 00–02.
 

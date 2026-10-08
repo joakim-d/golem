@@ -78,6 +78,16 @@
           "message": 3
         }
       ]
+    },
+    {
+      "owner": "golem-editor",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(golem-editor: .*)$",
+          "message": 1
+        }
+      ]
     }
   ]
 }

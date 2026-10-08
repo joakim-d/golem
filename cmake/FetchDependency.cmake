@@ -64,7 +64,8 @@ function(golem_fetch_dependency name)
     set(${CMAKE_MATCH_1} "${CMAKE_MATCH_2}")
   endforeach()
 
-  FetchContent_Declare(${name} ${declare_args} SYSTEM)
+  # FIND_PACKAGE_ARGS (in declare_args) must come last: SYSTEM goes before it.
+  FetchContent_Declare(${name} SYSTEM ${declare_args})
   FetchContent_MakeAvailable(${name})
 
   # A dependency without a CMakeLists.txt is only downloaded: hand its location to the caller.

@@ -32,7 +32,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 3 KiB, WRAM ≤ 128 B) | Done |
 | Cross-check in SameBoy (identical traces and cycles) | Done |
 | WAV rendering through SameBoy's sound emulation (`golem-wav`, `driver-wavs`), for listening | Done |
-| Editor, built step by step ([docs/editor-steps](docs/editor-steps/README.md)) | Steps 0–1 of milestone 1: editing model, live playback |
+| Editor, built step by step ([docs/editor-steps](docs/editor-steps/README.md)) | Milestone 1 built (editing model, live playback, window); manual check to do. See [docs/composer.md](docs/composer.md) |
 
 ## Layout
 
@@ -40,6 +40,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 core/         C++ library: song format, reference player, traces (+ unit tests)
 driver/       Game Boy sound driver, RGBDS assembly
 tools/        Command-line tools (golem-trace, golem-tracediff, golem-run, golem-encode, golem-wav)
+editor/       The editor (golem-editor): SDL3 + Dear ImGui tracker window
 tests/songs/  Test songs (.gsong) and their golden traces (.trace)
 docs/         Song format, driver contract, driver steps
 cmake/        CMake helpers (dependency fetching, GoogleTest)

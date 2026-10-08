@@ -226,6 +226,14 @@ void Document::set_order(std::size_t order)
     cursor_.order = std::min(order, song_.orders.size() - 1);
 }
 
+void Document::set_cursor(const Cursor& cursor)
+{
+    cursor_.order = std::min(cursor.order, song_.orders.size() - 1);
+    cursor_.row = std::min(cursor.row, kRowsPerPattern - 1);
+    cursor_.channel = std::min(cursor.channel, kChannels - 1);
+    cursor_.column = cursor.column;
+}
+
 bool Document::enter_key(char key)
 {
     if (cursor_.column == Column::Note) {

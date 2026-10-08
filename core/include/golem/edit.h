@@ -86,6 +86,7 @@ public:
     void move_columns(int delta); // Crosses channels.
     void move_channels(int delta); // Same column in the next/previous channel.
     void set_order(std::size_t order); // Clamped to the orders; keeps row and column.
+    void set_cursor(const Cursor& cursor); // Each part clamped, e.g. for a mouse click.
 
     // Entry at the cursor. Each one is a change (undoable) and moves the cursor down by the
     // edit step. Returns false, changing nothing, when the key means nothing in this column.
