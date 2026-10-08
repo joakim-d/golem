@@ -32,7 +32,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 3 KiB, WRAM ≤ 128 B) | Done |
 | Cross-check in SameBoy (identical traces and cycles) | Done |
 | WAV rendering through SameBoy's sound emulation (`golem-wav`, `driver-wavs`), for listening | Done |
-| Editor, built step by step ([docs/editor-steps](docs/editor-steps/README.md)) | Step 0 of milestone 1: the editing model |
+| Editor, built step by step ([docs/editor-steps](docs/editor-steps/README.md)) | Steps 0–1 of milestone 1: editing model, live playback |
 
 ## Layout
 

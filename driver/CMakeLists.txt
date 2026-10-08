@@ -123,6 +123,31 @@ golem_driver_test(tone) # Step 14
 golem_driver_test(vibrato) # Step 15
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
+
+# The editor's player ROM template: the test ROM shell and the driver, with an empty song slot
+# at $4000 that the editor fills with an encoded song (docs/editor-steps/01-live-playback.md).
+# It is compiled into golem_run as a byte array (GOLEM_PLAYER_ROM_SOURCE).
+set(player_stub ${DRIVER_BINARY_DIR}/player_song.asm)
+file(WRITE ${player_stub} "SECTION \"Song\", ROMX[$4000]\nSong::\n\tds 1 ; Filled in by the editor.\n")
+add_custom_command(
+  OUTPUT player_song.o
+  COMMAND ${RGBASM} ${RGBASM_FLAGS} -o player_song.o ${player_stub}
+  COMMENT "Assembling the player's song slot")
+add_custom_command(
+  OUTPUT ${DRIVER_BINARY_DIR}/player.gb
+  COMMAND ${RGBLINK} -o ${DRIVER_BINARY_DIR}/player.gb test_rom.o golem.o player_song.o
+  COMMAND ${RGBFIX} -v -p 0xFF -t GOLEM ${DRIVER_BINARY_DIR}/player.gb
+  DEPENDS test_rom.o golem.o player_song.o
+  COMMENT "Linking player.gb")
+add_custom_command(
+  OUTPUT ${DRIVER_BINARY_DIR}/player_rom.cpp
+  COMMAND ${CMAKE_COMMAND} -DINPUT=${DRIVER_BINARY_DIR}/player.gb
+    -DOUTPUT=${DRIVER_BINARY_DIR}/player_rom.cpp -DSYMBOL=kPlayerRom
+    -P ${PROJECT_SOURCE_DIR}/cmake/EmbedFile.cmake
+  DEPENDS ${DRIVER_BINARY_DIR}/player.gb ${PROJECT_SOURCE_DIR}/cmake/EmbedFile.cmake
+  COMMENT "Embedding player.gb")
+add_custom_target(player-rom DEPENDS ${DRIVER_BINARY_DIR}/player_rom.cpp)
+set(GOLEM_PLAYER_ROM_SOURCE ${DRIVER_BINARY_DIR}/player_rom.cpp PARENT_SCOPE)
 if(GOLEM_HAS_SAMEBOY)
   # Not part of the default build: render on demand to listen to the driver songs.
   add_custom_target(driver-wavs DEPENDS ${GOLEM_DRIVER_WAVS})
