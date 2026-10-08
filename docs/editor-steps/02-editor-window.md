@@ -21,7 +21,7 @@ In (`editor/`, SDL3 and Dear ImGui, both fetched with pinned versions):
 - **Title:** the file name, with `*` while there are unsaved changes.
 - **Audio:** an SDL audio stream fed by `LivePlayer`. Without playback in the build, Play is greyed out and its tooltip gives the reason.
 - **`GOLEM_EDITOR` option (on by default):** skips the editor and its dependencies when off.
-- **Headless runs:** `--quit-after-frames N` quits after N frames and `--play` starts playback, for the `editor.smoke` test (SDL's offscreen video and dummy audio). `--screenshot FILE.bmp` saves the last frame, so the window can be checked without a display.
+- **Headless runs:** `--quit-after-frames N` quits after N frames and `--play` starts playback, for the `editor.smoke` test (SDL's dummy video and audio drivers). `--screenshot FILE.bmp` saves the last frame, so the window can be checked without a display.
 
 Out: everything in the later steps of the [index](README.md).
 
