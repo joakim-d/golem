@@ -17,7 +17,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
    frame 212: write #2: expected NR22=F3, got NR22=F1
    ```
 
-3. WAV rendering is planned, but only as a check for human ears. It will never decide whether a test passes.
+3. WAV rendering, through SameBoy's sound emulation, lets you listen to the songs. It is a check for human ears only: it never decides whether a test passes.
 
 ## Status
 
@@ -31,14 +31,15 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Steps 0–15 done: every effect (0–F) |
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 3 KiB, WRAM ≤ 128 B) | Done |
 | Cross-check in SameBoy (identical traces and cycles) | Done |
-| Editor, WAV export | To do |
+| WAV rendering through SameBoy's sound emulation (`golem-wav`, `driver-wavs`), for listening | Done |
+| Editor | To do |
 
 ## Layout
 
 ```
 core/         C++ library: song format, reference player, traces (+ unit tests)
 driver/       Game Boy sound driver, RGBDS assembly
-tools/        Command-line tools (golem-trace, golem-tracediff, golem-run, golem-encode)
+tools/        Command-line tools (golem-trace, golem-tracediff, golem-run, golem-encode, golem-wav)
 tests/songs/  Test songs (.gsong) and their golden traces (.trace)
 docs/         Song format, driver contract, driver steps
 cmake/        CMake helpers (dependency fetching, GoogleTest)

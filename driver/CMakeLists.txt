@@ -49,6 +49,7 @@ add_custom_command(
   COMMENT "Assembling test_rom.asm")
 
 set(GOLEM_DRIVER_ROMS)
+set(GOLEM_DRIVER_WAVS)
 
 # golem_driver_test(<song>): builds <song>.gb from tests/songs/<song>.gsong and adds the
 # test driver.<song>, which compares its APU trace with tests/songs/<song>.trace and checks
@@ -83,6 +84,19 @@ function(golem_driver_test song)
     COMMENT "Linking ${song}.gb")
 
   set(GOLEM_DRIVER_ROMS ${GOLEM_DRIVER_ROMS} ${rom} PARENT_SCOPE)
+
+  # For listening (target driver-wavs): as many frames as the golden trace covers.
+  if(GOLEM_HAS_SAMEBOY)
+    file(STRINGS ${golden} header LIMIT_COUNT 1)
+    string(REGEX MATCH "frames=([0-9]+)" _ "${header}")
+    set(wav ${DRIVER_BINARY_DIR}/${song}.wav)
+    add_custom_command(
+      OUTPUT ${wav}
+      COMMAND golem-wav ${rom} ${wav} --frames ${CMAKE_MATCH_1}
+      DEPENDS golem-wav ${rom}
+      COMMENT "Rendering ${song}.wav")
+    set(GOLEM_DRIVER_WAVS ${GOLEM_DRIVER_WAVS} ${wav} PARENT_SCOPE)
+  endif()
   add_test(NAME driver.${song}
     COMMAND golem-run ${rom} --expect ${golden} --cycles
       --max-cycles ${GOLEM_DRIVER_MAX_PLAY_CYCLES} --emulator ${GOLEM_DRIVER_EMULATORS})
@@ -109,6 +123,10 @@ golem_driver_test(tone) # Step 14
 golem_driver_test(vibrato) # Step 15
 
 add_custom_target(driver-roms ALL DEPENDS ${GOLEM_DRIVER_ROMS})
+if(GOLEM_HAS_SAMEBOY)
+  # Not part of the default build: render on demand to listen to the driver songs.
+  add_custom_target(driver-wavs DEPENDS ${GOLEM_DRIVER_WAVS})
+endif()
 
 # The driver sections are the same in every test ROM: check them in one map file.
 add_test(NAME driver.size

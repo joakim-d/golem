@@ -13,16 +13,24 @@ struct golem_sb {
     uint64_t ticks; /* Time before the instruction being run, in 8 MHz ticks. */
     golem_gb_write_fn on_write;
     void* user;
+    golem_sample_fn on_sample;
+    void* sample_user;
 };
 
 static bool write_hook(GB_gameboy_t* gb, uint16_t address, uint8_t value)
 {
     golem_sb* self = GB_get_user_data(gb);
-    if (address >= 0xFF10 && address <= 0xFF3F) {
+    if (self->on_write != NULL && address >= 0xFF10 && address <= 0xFF3F) {
         self->on_write(
             self->user, address, value, (uint16_t)(self->ticks / TICKS_PER_CYCLE));
     }
     return true;
+}
+
+static void sample_hook(GB_gameboy_t* gb, GB_sample_t* sample)
+{
+    golem_sb* self = GB_get_user_data(gb);
+    self->on_sample(self->sample_user, sample->left, sample->right);
 }
 
 /* A stand-in for the DMG boot ROM: turns the LCD on as the real one leaves it (so VBlank
@@ -77,6 +85,15 @@ int golem_sb_run_frame(golem_sb* sb, const char** error)
         sb->ticks += GB_run(sb->gb);
     }
     return 0;
+}
+
+void golem_sb_set_audio(golem_sb* sb, unsigned sample_rate, golem_sample_fn on_sample, void* user)
+{
+    sb->on_sample = on_sample;
+    sb->sample_user = user;
+    GB_set_sample_rate(sb->gb, sample_rate);
+    GB_set_highpass_filter_mode(sb->gb, GB_HIGHPASS_ACCURATE);
+    GB_apu_set_sample_callback(sb->gb, sample_hook);
 }
 
 void golem_sb_destroy(golem_sb* sb)
