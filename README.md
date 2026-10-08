@@ -31,6 +31,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 | Sound driver (RGBDS), grown step by step ([docs/driver-steps](docs/driver-steps/README.md)) | Steps 0–15 done: every effect (0–F) |
 | Cycle and size budgets (`GolemPlay` ≤ 14000 cycles, ROM ≤ 3 KiB, WRAM ≤ 128 B) | Done |
 | Cross-check in SameBoy (identical traces and cycles) | Done |
+| WAV rendering through SameBoy's sound emulation (`golem-wav`, `driver-wavs`), for listening | Done |
 | Editor, WAV export | To do |
 
 ## Layout
@@ -38,7 +39,7 @@ In Golem, the definition of correct behaviour exists before the driver code that
 ```
 core/         C++ library: song format, reference player, traces (+ unit tests)
 driver/       Game Boy sound driver, RGBDS assembly
-tools/        Command-line tools (golem-trace, golem-tracediff, golem-run, golem-encode)
+tools/        Command-line tools (golem-trace, golem-tracediff, golem-run, golem-encode, golem-wav)
 tests/songs/  Test songs (.gsong) and their golden traces (.trace)
 docs/         Song format, driver contract, driver steps
 cmake/        CMake helpers (dependency fetching, GoogleTest)

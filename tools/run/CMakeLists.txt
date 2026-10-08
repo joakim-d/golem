@@ -3,7 +3,9 @@ add_library(golem_gb_core STATIC src/gb_core.c)
 target_link_libraries(golem_gb_core PRIVATE peanut_gb::peanut_gb)
 
 add_library(golem_run
-  src/rom_runner.cpp)
+  src/audio.cpp
+  src/rom_runner.cpp
+  src/wav.cpp)
 add_library(golem::run ALIAS golem_run)
 
 target_include_directories(golem_run PUBLIC include)
@@ -25,7 +27,10 @@ else()
 endif()
 
 if(BUILD_TESTING)
-  add_executable(golem_run_tests tests/rom_runner_test.cpp)
+  add_executable(golem_run_tests
+    tests/audio_test.cpp
+    tests/rom_runner_test.cpp
+    tests/wav_test.cpp)
   target_link_libraries(golem_run_tests PRIVATE golem::run GTest::gtest_main)
   if(GOLEM_HAS_SAMEBOY)
     target_compile_definitions(golem_run_tests PRIVATE GOLEM_HAS_SAMEBOY)

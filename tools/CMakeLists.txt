@@ -14,3 +14,6 @@ target_link_libraries(golem-encode PRIVATE golem::core)
 
 add_executable(golem-tables tables_main.cpp)
 target_link_libraries(golem-tables PRIVATE golem::core)
+
+add_executable(golem-wav wav_main.cpp)
+target_link_libraries(golem-wav PRIVATE golem::run)

@@ -12,7 +12,12 @@ extern "C" {
 
 typedef struct golem_sb golem_sb;
 
-/* Returns NULL on failure, with *error describing why. */
+typedef void (*golem_sample_fn)(
+    void* user,
+    int16_t left,
+    int16_t right);
+
+/* Returns NULL on failure, with *error describing why. `on_write` may be NULL. */
 golem_sb* golem_sb_create(
     const uint8_t* rom,
     size_t size,
@@ -24,6 +29,14 @@ golem_sb* golem_sb_create(
 int golem_sb_run_frame(
     golem_sb* sb,
     const char** error);
+
+/* Starts audio output: `on_sample` gets every stereo sample, at `sample_rate` Hz, through
+ * SameBoy's hardware-like high-pass filter. */
+void golem_sb_set_audio(
+    golem_sb* sb,
+    unsigned sample_rate,
+    golem_sample_fn on_sample,
+    void* user);
 
 void golem_sb_destroy(golem_sb* sb);
 
