@@ -2,9 +2,24 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <ostream>
+
 #include <initializer_list>
 
 using namespace golem;
+
+namespace golem {
+
+// Readable emulator names in GoogleTest output.
+void PrintTo(
+    Emulator emulator,
+    std::ostream* out)
+{
+    *out << emulator_name(emulator);
+}
+
+} // namespace golem
 
 namespace {
 
@@ -91,11 +106,79 @@ std::vector<std::uint8_t> counting_rom()
 
 TEST(
     RomRunner,
+    PeanutGbIsAlwaysAvailableFirst)
+{
+    const auto emulators = available_emulators();
+    ASSERT_FALSE(emulators.empty());
+    EXPECT_EQ(emulators.front(), Emulator::PeanutGb);
+#ifdef GOLEM_HAS_SAMEBOY
+    EXPECT_EQ(emulators, (std::vector<Emulator> {Emulator::PeanutGb, Emulator::SameBoy}));
+#else
+    EXPECT_EQ(emulators, (std::vector<Emulator> {Emulator::PeanutGb}));
+#endif
+}
+
+TEST(
+    RomRunner,
+    EmulatorNames)
+{
+    EXPECT_EQ(emulator_name(Emulator::PeanutGb), "Peanut-GB");
+    EXPECT_EQ(emulator_name(Emulator::SameBoy), "SameBoy");
+}
+
+TEST(
+    RomRunner,
+    PeanutGbRejectsABadHeaderChecksum)
+{
+    auto rom = counting_rom();
+    rom[0x14D] ^= 0xFF;
+    EXPECT_THROW(run_rom(rom, 1, Emulator::PeanutGb), RunError);
+}
+
+#ifndef GOLEM_HAS_SAMEBOY
+TEST(
+    RomRunner,
+    SameBoyIsRejectedWhenNotBuiltIn)
+{
+    EXPECT_THROW(run_rom(counting_rom(), 1, Emulator::SameBoy), RunError);
+}
+#endif
+
+// The same behaviour in every emulator built in.
+class EmulatorTest : public ::testing::TestWithParam<Emulator> {
+protected:
+    void SetUp() override
+    {
+        const auto emulators = available_emulators();
+        if (std::find(emulators.begin(), emulators.end(), GetParam()) == emulators.end()) {
+            GTEST_SKIP() << emulator_name(GetParam()) << " is not built in";
+        }
+    }
+
+    RunResult run(
+        const std::vector<std::uint8_t>& rom,
+        std::uint32_t frames) const
+    {
+        return run_rom(rom, frames, GetParam());
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    Emulators,
+    EmulatorTest,
+    ::testing::Values(
+        Emulator::PeanutGb,
+        Emulator::SameBoy),
+    [](const ::testing::TestParamInfo<Emulator>& info) {
+        return info.param == Emulator::PeanutGb ? std::string("PeanutGb") : std::string("SameBoy");
+    });
+
+TEST_P(
+    EmulatorTest,
     SplitsWritesIntoFramesAtMarkers)
 {
-    const Trace trace = run_rom(counting_rom(), 4).trace;
     EXPECT_EQ(
-        trace,
+        run(counting_rom(), 4).trace,
         make_trace({
             {{reg::NR50, 0x77}},
             {{reg::NR51, 0x01}},
@@ -104,47 +187,44 @@ TEST(
         }));
 }
 
-TEST(
-    RomRunner,
+TEST_P(
+    EmulatorTest,
     ZeroFramesIsAnEmptyTrace)
 {
-    const auto result = run_rom(counting_rom(), 0);
+    const auto result = run(counting_rom(), 0);
     EXPECT_EQ(result.trace, Trace {});
     EXPECT_TRUE(result.frame_cycles.empty());
 }
 
-TEST(
-    RomRunner,
+TEST_P(
+    EmulatorTest,
     FailsWhenFramesDoNotComplete)
 {
     RomBuilder rom;
     rom.code({kLdh, kMarker, 0x18, 0xFE}); // One marker, then jr to itself forever.
-    EXPECT_THROW(run_rom(rom.build(), 2), RunError);
+    EXPECT_THROW(run(rom.build(), 2), RunError);
 }
 
-TEST(
-    RomRunner,
-    RejectsInvalidRoms)
+TEST_P(
+    EmulatorTest,
+    RejectsRomsSmallerThanTheHeader)
 {
-    auto rom = counting_rom();
-    rom[0x14D] ^= 0xFF; // Header checksum.
-    EXPECT_THROW(run_rom(rom, 1), RunError);
-    EXPECT_THROW(run_rom(std::vector<std::uint8_t>(0x100), 1), RunError);
+    EXPECT_THROW(run(std::vector<std::uint8_t>(0x100), 1), RunError);
 }
 
-TEST(
-    RomRunner,
+TEST_P(
+    EmulatorTest,
     FramesWithoutEndMarkerHaveNoCycles)
 {
-    const auto cycles = run_rom(counting_rom(), 4).frame_cycles;
+    const auto cycles = run(counting_rom(), 4).frame_cycles;
     ASSERT_EQ(cycles.size(), 4u);
     for (const auto& frame : cycles) {
         EXPECT_EQ(frame, std::nullopt);
     }
 }
 
-TEST(
-    RomRunner,
+TEST_P(
+    EmulatorTest,
     MeasuresCyclesFromFrameMarkerToEndMarker)
 {
     RomBuilder rom;
@@ -159,7 +239,7 @@ TEST(
         .code({0x00})
         .code({kLdh, kMarker}) // Frame 3 completes frame 2
         .code({0x18, 0xFE}); // jr to itself
-    const auto result = run_rom(rom.build(), 3);
+    const auto result = run(rom.build(), 3);
     EXPECT_EQ(result.trace, make_trace({{}, {}, {}})); // Markers are not APU writes.
     ASSERT_EQ(result.frame_cycles.size(), 3u);
     EXPECT_EQ(result.frame_cycles[0], 12u);

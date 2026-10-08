@@ -5,9 +5,23 @@
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace golem {
+
+// Emulator a ROM runs in. Peanut-GB is always built; SameBoy, an accurate emulator used to
+// cross-check, only with GCC or Clang (see available_emulators()).
+enum class Emulator {
+    PeanutGb,
+    SameBoy,
+};
+
+// The emulators built in, Peanut-GB first.
+std::vector<Emulator> available_emulators();
+
+// "Peanut-GB" or "SameBoy".
+std::string emulator_name(Emulator emulator);
 
 // Thrown when a ROM cannot be loaded or does not produce the expected frames.
 class RunError : public std::runtime_error {
@@ -37,13 +51,16 @@ struct RunResult {
 // Emulator frames allowed on top of the requested frames before giving up.
 constexpr std::uint32_t kExtraEmulatorFrames = 60;
 
-// Runs `rom` headless and returns the APU writes ($FF10-$FF3F) of its first `frames`
-// frames, as delimited by kFrameMarker writes, and the cycles of each frame. Writes before
-// the first marker are ignored and markers are not part of the trace. Throws RunError if
-// the ROM is invalid, the emulator reports an error, or the frames are not complete within
-// frames + kExtraEmulatorFrames emulator frames.
+// Runs `rom` headless in `emulator` and returns the APU writes ($FF10-$FF3F) of its first
+// `frames` frames, as delimited by kFrameMarker writes, and the cycles of each frame. Writes
+// before the first marker are ignored and markers are not part of the trace. Throws
+// RunError if the emulator is not built in, the ROM is invalid, the emulator reports an
+// error, or the frames are not complete within frames + kExtraEmulatorFrames emulator
+// frames. SameBoy starts from a minimal boot ROM that turns the LCD on, as the DMG boot
+// ROM leaves it, and does not check the cartridge header.
 RunResult run_rom(
     const std::vector<std::uint8_t>& rom,
-    std::uint32_t frames);
+    std::uint32_t frames,
+    Emulator emulator = Emulator::PeanutGb);
 
 } // namespace golem

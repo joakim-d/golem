@@ -21,6 +21,7 @@ if(BUILD_TESTING)
   include(gtest)
 endif()
 include(peanut_gb)
+include(sameboy)
 
 add_subdirectory(core)
 add_subdirectory(driver)

@@ -1,6 +1,9 @@
 #include "golem/rom_runner.h"
 
 #include "gb_core.h"
+#ifdef GOLEM_HAS_SAMEBOY
+#include "sameboy_core.h"
+#endif
 
 #include <memory>
 #include <string>
@@ -50,18 +53,112 @@ namespace {
         }
     }
 
-    struct Destroy {
-        void operator()(golem_gb* gb) const
-        {
-            golem_gb_destroy(gb);
-        }
+    // An emulator running one ROM, reporting APU writes to `record`.
+    class Machine {
+    public:
+        virtual ~Machine() = default;
+        // Throws RunError on an emulation error.
+        virtual void run_frame() = 0;
     };
+
+    class PeanutGbMachine : public Machine {
+    public:
+        PeanutGbMachine(
+            const std::vector<std::uint8_t>& rom,
+            Recorder& recorder)
+        {
+            const char* error = nullptr;
+            gb_ = golem_gb_create(rom.data(), rom.size(), record, &recorder, &error);
+            if (gb_ == nullptr) {
+                throw RunError(error);
+            }
+        }
+
+        ~PeanutGbMachine() override
+        {
+            golem_gb_destroy(gb_);
+        }
+
+        void run_frame() override
+        {
+            const char* error = nullptr;
+            if (golem_gb_run_frame(gb_, &error) != 0) {
+                throw RunError(std::string("emulator stopped: ") + error);
+            }
+        }
+
+    private:
+        golem_gb* gb_ = nullptr;
+    };
+
+#ifdef GOLEM_HAS_SAMEBOY
+    class SameBoyMachine : public Machine {
+    public:
+        SameBoyMachine(
+            const std::vector<std::uint8_t>& rom,
+            Recorder& recorder)
+        {
+            const char* error = nullptr;
+            sb_ = golem_sb_create(rom.data(), rom.size(), record, &recorder, &error);
+            if (sb_ == nullptr) {
+                throw RunError(error);
+            }
+        }
+
+        ~SameBoyMachine() override
+        {
+            golem_sb_destroy(sb_);
+        }
+
+        void run_frame() override
+        {
+            const char* error = nullptr;
+            golem_sb_run_frame(sb_, &error);
+        }
+
+    private:
+        golem_sb* sb_ = nullptr;
+    };
+#endif
+
+    std::unique_ptr<Machine> make_machine(
+        Emulator emulator,
+        const std::vector<std::uint8_t>& rom,
+        Recorder& recorder)
+    {
+        switch (emulator) {
+        case Emulator::PeanutGb:
+            return std::make_unique<PeanutGbMachine>(rom, recorder);
+        case Emulator::SameBoy:
+#ifdef GOLEM_HAS_SAMEBOY
+            return std::make_unique<SameBoyMachine>(rom, recorder);
+#else
+            break;
+#endif
+        }
+        throw RunError(emulator_name(emulator) + " is not built in");
+    }
 
 } // namespace
 
+std::vector<Emulator> available_emulators()
+{
+#ifdef GOLEM_HAS_SAMEBOY
+    return {Emulator::PeanutGb, Emulator::SameBoy};
+#else
+    return {Emulator::PeanutGb};
+#endif
+}
+
+std::string emulator_name(Emulator emulator)
+{
+    return emulator == Emulator::PeanutGb ? "Peanut-GB" : "SameBoy";
+}
+
 RunResult run_rom(
     const std::vector<std::uint8_t>& rom,
-    std::uint32_t frames)
+    std::uint32_t frames,
+    Emulator emulator)
 {
     RunResult result;
     result.trace.frames = frames;
@@ -74,18 +171,10 @@ RunResult run_rom(
     }
 
     Recorder recorder {&result};
-    const char* error = nullptr;
-    std::unique_ptr<golem_gb, Destroy> gb(
-        golem_gb_create(rom.data(), rom.size(), record, &recorder, &error));
-    if (!gb) {
-        throw RunError(error);
-    }
-
+    const auto machine = make_machine(emulator, rom, recorder);
     const std::uint64_t limit = std::uint64_t {frames} + kExtraEmulatorFrames;
     for (std::uint64_t emulated = 0; emulated < limit && !recorder.done; ++emulated) {
-        if (golem_gb_run_frame(gb.get(), &error) != 0) {
-            throw RunError(std::string("emulator stopped: ") + error);
-        }
+        machine->run_frame();
     }
     if (!recorder.done) {
         const auto completed = recorder.frame < 0 ? 0 : recorder.frame;

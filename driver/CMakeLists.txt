@@ -7,6 +7,14 @@ set(GOLEM_DRIVER_MAX_PLAY_CYCLES 14000)
 set(GOLEM_DRIVER_MAX_ROM_BYTES 3072)
 set(GOLEM_DRIVER_MAX_WRAM_BYTES 128)
 
+# Every driver test runs in Peanut-GB, and also in SameBoy where it is built (GCC or Clang),
+# which must agree on the trace and on every call's cycles (docs/driver-steps/16-*.md).
+if(GOLEM_HAS_SAMEBOY)
+  set(GOLEM_DRIVER_EMULATORS both)
+else()
+  set(GOLEM_DRIVER_EMULATORS peanut)
+endif()
+
 find_program(RGBASM rgbasm)
 find_program(RGBLINK rgblink)
 find_program(RGBFIX rgbfix)
@@ -44,7 +52,7 @@ set(GOLEM_DRIVER_ROMS)
 
 # golem_driver_test(<song>): builds <song>.gb from tests/songs/<song>.gsong and adds the
 # test driver.<song>, which compares its APU trace with tests/songs/<song>.trace and checks
-# every GolemPlay call against the cycle budget.
+# every GolemPlay call against the cycle budget, in GOLEM_DRIVER_EMULATORS.
 function(golem_driver_test song)
   set(gsong ${PROJECT_SOURCE_DIR}/tests/songs/${song}.gsong)
   set(golden ${PROJECT_SOURCE_DIR}/tests/songs/${song}.trace)
@@ -77,7 +85,7 @@ function(golem_driver_test song)
   set(GOLEM_DRIVER_ROMS ${GOLEM_DRIVER_ROMS} ${rom} PARENT_SCOPE)
   add_test(NAME driver.${song}
     COMMAND golem-run ${rom} --expect ${golden} --cycles
-      --max-cycles ${GOLEM_DRIVER_MAX_PLAY_CYCLES})
+      --max-cycles ${GOLEM_DRIVER_MAX_PLAY_CYCLES} --emulator ${GOLEM_DRIVER_EMULATORS})
 endfunction()
 
 # One test per step of docs/driver-steps/: every song listed here must match its trace.

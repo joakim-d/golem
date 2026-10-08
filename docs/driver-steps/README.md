@@ -20,6 +20,7 @@ The sound driver grows one channel or one effect at a time. Each step has a plan
 | [13](13-portamento.md) | Portamento up and down (1, 2) | `driver.portamento` | Done |
 | [14](14-tone-portamento.md) | Tone portamento (3) | `driver.tone` | Done |
 | [15](15-vibrato.md) | Vibrato (4), the last effect | `driver.vibrato` | Done |
+| [16](16-sameboy-cross-check.md) | Cross-check every driver test in SameBoy | Every `driver.*` test with `--emulator both` | Done |
 
 ## Rules for every step
 
