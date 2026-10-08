@@ -72,6 +72,10 @@ int main(
         std::fprintf(stderr, "golem-editor: cannot start SDL video: %s\n", SDL_GetError());
         return 1;
     }
+    // With SDL's default 1024-frame buffer, PipeWire's PulseAudio server (0.3.x) can stop asking
+    // for audio: silence, then a hang when the device closes. 2048 frames (46 ms) avoids it. The
+    // SDL_AUDIO_DEVICE_SAMPLE_FRAMES environment variable still overrides this.
+    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "2048");
     const bool has_audio = SDL_InitSubSystem(SDL_INIT_AUDIO);
     if (!has_audio) {
         std::fprintf(stderr, "golem-editor: no audio: %s\n", SDL_GetError());
