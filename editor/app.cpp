@@ -733,7 +733,8 @@ void App::draw_wave_canvas()
 void App::draw_pattern()
 {
     ImGui::BeginChild("Pattern", ImVec2(0, 0), ImGuiChildFlags_Borders);
-    pattern_focused_ = ImGui::IsWindowFocused();
+    // The table's rows scroll in a child window of their own, which a click focuses.
+    pattern_focused_ = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
     const auto& cursor = doc_.cursor();
     const auto& order = doc_.song().orders[cursor.order];
 
