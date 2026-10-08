@@ -16,10 +16,12 @@ else()
 endif()
 
 # Smoke test: the editor opens a song, plays it and draws frames headless, then quits.
+# SDL's dummy video driver draws in a software framebuffer. The offscreen driver advertises
+# OpenGL (through EGL), so on macOS SDL makes the window an OpenGL one, which fails there.
 if(BUILD_TESTING)
   add_test(NAME editor.smoke
     COMMAND golem-editor ${PROJECT_SOURCE_DIR}/tests/songs/scale.gsong --play
       --quit-after-frames 60)
   set_tests_properties(editor.smoke PROPERTIES
-    ENVIRONMENT "SDL_VIDEO_DRIVER=offscreen;SDL_AUDIO_DRIVER=dummy")
+    ENVIRONMENT "SDL_VIDEO_DRIVER=dummy;SDL_AUDIO_DRIVER=dummy")
 endif()

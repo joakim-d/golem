@@ -2,7 +2,7 @@
 //
 // The Golem editor: a tracker window to write songs and play them with the real driver in
 // SameBoy. --play starts playback at once; --quit-after-frames exits after N frames (for the
-// smoke test, with SDL_VIDEO_DRIVER=offscreen and SDL_AUDIO_DRIVER=dummy), and --screenshot
+// smoke test, with SDL_VIDEO_DRIVER=dummy and SDL_AUDIO_DRIVER=dummy), and --screenshot
 // saves that last frame.
 
 #include "app.h"
@@ -85,7 +85,7 @@ int main(
     }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
     if (renderer == nullptr) {
-        // No accelerated renderer (e.g. offscreen video on some systems): draw in software.
+        // No accelerated renderer (e.g. headless video drivers): draw in software.
         std::fprintf(
             stderr, "golem-editor: no accelerated renderer (%s), using software\n", SDL_GetError());
         renderer = SDL_CreateRenderer(window, SDL_SOFTWARE_RENDERER);
