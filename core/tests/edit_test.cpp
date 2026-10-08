@@ -1,10 +1,12 @@
 #include "golem/edit.h"
 
 #include "golem/instrument_fields.h"
+#include "golem/player.h"
 #include "golem/song_text.h"
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
@@ -609,6 +611,69 @@ TEST(
     EXPECT_TRUE(doc.modified());
     doc.undo();
     EXPECT_TRUE(doc.modified()); // Back to the state before the step, not the saved one.
+}
+
+// --- Note preview ---
+
+TEST(
+    Edit,
+    PreviewSongPlaysOneNote)
+{
+    Document doc;
+    doc.set_wave(3, wave_preset(WavePreset::Sine));
+    doc.enter_note(kC4 + 7); // The preview ignores the song's own patterns and orders.
+    const Song preview = preview_song(doc.song(), 2, kC4, 3);
+    Song same_sounds = doc.song(); // The song with the preview's orders, patterns and speed.
+    same_sounds.orders = preview.orders;
+    same_sounds.patterns = preview.patterns;
+    same_sounds.ticks_per_row = preview.ticks_per_row;
+    EXPECT_EQ(preview, same_sounds); // Same instruments and waves.
+    EXPECT_EQ(preview.ticks_per_row, 0); // 256 ticks: the note is never retriggered.
+    ASSERT_EQ(preview.orders.size(), 1u);
+    const Order& order = preview.orders[0];
+    for (std::size_t channel = 0; channel < kChannels; ++channel) {
+        const Pattern& pattern = preview.patterns[order[channel]];
+        for (std::size_t row = 0; row < kRowsPerPattern; ++row) {
+            const Cell expected = channel == 2 && row == 0 ? Cell {kC4, 3, 0, 0} : Cell {};
+            EXPECT_EQ(pattern[row], expected) << "channel " << channel << " row " << row;
+        }
+    }
+    EXPECT_NO_THROW(validate_song(preview));
+}
+
+TEST(
+    Edit,
+    PreviewSongTriggersTheChannel)
+{
+    const Document doc;
+    const std::uint16_t triggers[] = {reg::NR14, reg::NR24, reg::NR34, reg::NR44};
+    for (std::size_t channel = 0; channel < kChannels; ++channel) {
+        const auto frames = render(preview_song(doc.song(), channel, kC4, 1), 2);
+        const auto& writes = frames[1]; // The first row.
+        const bool triggered = std::any_of(writes.begin(), writes.end(), [&](const ApuWrite& w) {
+            return w.address == triggers[channel] && (w.value & 0x80) != 0;
+        });
+        EXPECT_TRUE(triggered) << "channel " << channel;
+        for (const auto& write : writes) {
+            for (std::size_t other = 0; other < kChannels; ++other) {
+                if (other != channel) {
+                    EXPECT_NE(write.address, triggers[other]) << "channel " << channel;
+                }
+            }
+        }
+    }
+}
+
+TEST(
+    Edit,
+    PreviewSongClampsTheInstrument)
+{
+    const Document doc;
+    for (const auto& [instrument, expected] : {std::pair<int, int> {0, 1}, {16, 15}}) {
+        const Song preview =
+            preview_song(doc.song(), 0, kC4, static_cast<std::uint8_t>(instrument));
+        EXPECT_EQ(preview.patterns[preview.orders[0][0]][0].instrument, expected);
+    }
 }
 
 // --- Files ---

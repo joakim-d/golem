@@ -2,12 +2,20 @@
 
 #include "golem/wav.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
 namespace golem {
 
 constexpr unsigned kDefaultSampleRate = 44100;
+
+// Adds `count` samples of `from` to `into`, clamping each channel to the 16-bit range: two
+// players heard at once.
+void mix_into(
+    StereoSample* into,
+    const StereoSample* from,
+    std::size_t count);
 
 // Plays `rom` in SameBoy (a DMG, with its hardware-like high-pass filter) for `frames`
 // emulator frames from power-on, and returns what it outputs: about

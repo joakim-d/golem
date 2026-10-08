@@ -162,6 +162,84 @@ TEST(
     EXPECT_EQ(actual, expected);
 }
 
+// --- Position ---
+
+namespace {
+
+// Two orders of empty rows, one frame per row: the frame number gives the position.
+Song row_per_frame_song()
+{
+    return parse_song_text("ticks_per_row 01\norder 00 00 00 00\norder 00 00 00 00\npattern 00\n");
+}
+
+// Samples per emulator frame: 44100 Hz / (4194304 Hz / 70224 cycles).
+constexpr double kSamplesPerFrame = 44100.0 * 70224 / 4194304;
+
+// Rows from the start of the song: order 0 has rows 0-63, order 1 rows 64-127.
+long absolute_row(const Player::Position& position)
+{
+    return static_cast<long>(position.order * kRowsPerPattern + position.row);
+}
+
+} // namespace
+
+TEST(
+    LivePlayer,
+    NoPositionWhenNotPlaying)
+{
+    LivePlayer player;
+    EXPECT_FALSE(player.position());
+    player.play(row_per_frame_song());
+    render(player, 4410);
+    player.stop();
+    EXPECT_FALSE(player.position());
+}
+
+TEST(
+    LivePlayer,
+    PositionFollowsTheRenderedSamples)
+{
+    LivePlayer player;
+    player.play(row_per_frame_song());
+    EXPECT_EQ(player.position(), Player::Position {}); // Nothing rendered yet.
+    render(player, static_cast<std::size_t>(100 * kSamplesPerFrame));
+    // Frame n plays row n - 1; frame 1 starts within the first frame of emulation.
+    const auto position = player.position();
+    ASSERT_TRUE(position);
+    EXPECT_NEAR(absolute_row(*position), 99, 1);
+    EXPECT_EQ(position->tick, 0u);
+}
+
+TEST(
+    LivePlayer,
+    PositionAllowsForTheLatency)
+{
+    LivePlayer player;
+    player.play(row_per_frame_song());
+    for (int i = 0; i < 100; ++i) { // In pieces, as an audio callback would.
+        render(player, static_cast<std::size_t>(kSamplesPerFrame));
+    }
+    const auto now = player.position();
+    const auto earlier = player.position(static_cast<std::size_t>(30 * kSamplesPerFrame));
+    ASSERT_TRUE(now && earlier);
+    EXPECT_NEAR(absolute_row(*now) - absolute_row(*earlier), 30, 1);
+    EXPECT_EQ(player.position(1000000), Player::Position {}); // Before the first row.
+}
+
+TEST(
+    LivePlayer,
+    PositionStartsOverWithPlay)
+{
+    LivePlayer player;
+    player.play(row_per_frame_song());
+    render(player, static_cast<std::size_t>(50 * kSamplesPerFrame));
+    player.play(row_per_frame_song());
+    render(player, static_cast<std::size_t>(10 * kSamplesPerFrame));
+    const auto position = player.position();
+    ASSERT_TRUE(position);
+    EXPECT_NEAR(absolute_row(*position), 9, 1);
+}
+
 #else
 
 TEST(
@@ -173,6 +251,7 @@ TEST(
     LivePlayer player;
     EXPECT_THROW(player.play(test_song("scale")), RunError);
     EXPECT_EQ(peak(render(player, 100)), 0);
+    EXPECT_FALSE(player.position());
 }
 
 #endif

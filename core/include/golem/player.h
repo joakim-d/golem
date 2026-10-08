@@ -23,6 +23,19 @@ public:
     // call n + 1 the writes of the n-th play call (frame n).
     std::vector<ApuWrite> step();
 
+    // Where in the song a frame is.
+    struct Position {
+        std::size_t order = 0;
+        std::size_t row = 0;
+        unsigned tick = 0; // 0 is the row tick.
+
+        bool operator==(const Position& other) const;
+    };
+
+    // Position of the frame the last step() played: order 0, row 0, tick 0 before the first
+    // row (frame 0 and before).
+    Position position() const;
+
 private:
     struct Channel {
         std::uint8_t instrument = 1;
@@ -110,6 +123,7 @@ private:
     unsigned tick_ = 0;
     std::size_t order_ = 0;
     std::size_t row_ = 0;
+    Position position_;
     std::optional<std::uint8_t> jump_order_;
     std::optional<std::uint8_t> break_row_;
     std::array<Channel, kChannels> channels_;

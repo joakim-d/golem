@@ -13,6 +13,7 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -21,20 +22,36 @@ namespace {
 
 constexpr int kSampleRate = 44100;
 
-// SDL asks for more audio on its own thread: the song is rendered there by LivePlayer.
+// Samples between the one being rendered and the one being heard: those queued in the stream
+// and the device's buffer (at its own rate).
+std::size_t audio_latency(SDL_AudioStream* audio)
+{
+    std::size_t samples = static_cast<std::size_t>(std::max(SDL_GetAudioStreamQueued(audio), 0))
+                        / sizeof(golem::StereoSample);
+    SDL_AudioSpec device;
+    int frames = 0;
+    if (SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(audio), &device, &frames)
+        && device.freq > 0) {
+        samples +=
+            static_cast<std::size_t>(frames) * kSampleRate / static_cast<std::size_t>(device.freq);
+    }
+    return samples;
+}
+
+// SDL asks for more audio on its own thread: the song and note previews are rendered there.
 void SDLCALL feed_audio(
     void* userdata,
     SDL_AudioStream* stream,
     int additional_amount,
     int)
 {
-    auto* player = static_cast<golem::LivePlayer*>(userdata);
+    auto* app = static_cast<golem::editor::App*>(userdata);
     static thread_local std::vector<golem::StereoSample> samples;
     samples.resize(static_cast<std::size_t>(additional_amount) / sizeof(golem::StereoSample));
     if (samples.empty()) {
         return;
     }
-    player->render(samples.data(), samples.size());
+    app->render_audio(samples.data(), samples.size());
     SDL_PutAudioStreamData(
         stream, samples.data(), static_cast<int>(samples.size() * sizeof(golem::StereoSample)));
 }
@@ -117,7 +134,7 @@ int main(
         if (has_audio) {
             const SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, kSampleRate};
             audio = SDL_OpenAudioDeviceStream(
-                SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, feed_audio, &app.player());
+                SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, feed_audio, &app);
             if (audio != nullptr) {
                 SDL_ResumeAudioStreamDevice(audio);
             } else {
@@ -133,6 +150,9 @@ int main(
             while (SDL_PollEvent(&event)) {
                 ImGui_ImplSDL3_ProcessEvent(&event);
                 app.handle_event(event);
+            }
+            if (audio != nullptr) {
+                app.set_audio_latency(audio_latency(audio));
             }
             ImGui_ImplSDLRenderer3_NewFrame();
             ImGui_ImplSDL3_NewFrame();

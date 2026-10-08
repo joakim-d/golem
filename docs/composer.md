@@ -16,7 +16,8 @@ Playback needs a build with SameBoy (GCC or Clang) and RGBDS. Without them, the 
 ## The window
 
 - **Toolbar**
-  - **Play / Stop** plays the song from the beginning, with what you have written so far. Space does the same while the pattern has the focus.
+  - **Play / Stop** plays the song from the beginning, with what you have written so far. Space does the same while the pattern has the focus. While the song plays, the row you hear is shaded green in the pattern.
+  - **Follow**, while the song plays, shows the order being played and scrolls with its rows. Turn it off to look at or edit another part of the song meanwhile.
   - **Octave** is the octave of the note keys' lower row.
   - **Edit step** is how many rows the cursor moves down after each entry (0 stays in place).
   - **Instrument** is the instrument given to the notes you enter.
@@ -52,6 +53,8 @@ Z X C V B N M , . /         <- C D E F G A B C D E (octave)
 ```
 
 The note gets the current instrument. `1` enters a note off (effect `C00`: volume 0).
+
+You hear each note as you enter it: the driver plays it with the current instrument on the cursor's channel, until you release the key (3 seconds at most). This works while the song plays too, on top of it. The preview plays the note alone, without the cell's effect.
 
 **Hex digits** (in the instrument and effect fields) are 0–9 on the number row or keypad, and A–F as letters.
 
@@ -106,6 +109,6 @@ The effect column takes the 16 effects of the [song format](song-format.md). The
 
 ## Not yet
 
-- Playing from the cursor, and hearing edits while the song plays.
+- Playing from the cursor, and hearing edits while the song plays (edits are heard on the next Play).
 - Selection and copy/paste.
 - Exporting a ROM or a WAV from the editor (`golem-wav` renders a driver test ROM).

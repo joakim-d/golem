@@ -5,6 +5,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -27,7 +28,13 @@ public:
     void draw();
 
     bool quit_requested() const;
-    LivePlayer& player();
+
+    // Fills `samples` with the song and the note preview mixed; runs on SDL's audio thread.
+    void render_audio(
+        StereoSample* samples,
+        std::size_t count);
+    // Samples rendered but not heard yet, for the playing row.
+    void set_audio_latency(std::size_t samples);
 
 private:
     enum class Pending {
@@ -65,6 +72,11 @@ private:
         const char* const* files,
         int filter);
     void toggle_playback();
+    // Plays `note` with the current instrument on the cursor's channel until `key` is released.
+    void start_preview(
+        std::uint8_t note,
+        SDL_Scancode key);
+    void stop_preview();
     void fail(const std::string& message);
 
     bool handle_shortcut(const SDL_KeyboardEvent& key);
@@ -87,6 +99,12 @@ private:
     SDL_Window* window_;
     edit::Document doc_;
     LivePlayer player_;
+    LivePlayer preview_;
+    std::optional<SDL_Scancode> preview_key_;
+    Uint64 preview_started_ = 0; // SDL_GetTicks() when the preview started.
+    std::atomic<std::size_t> audio_latency_ {0};
+    bool follow_ = true;
+    std::optional<std::pair<std::size_t, std::size_t>> followed_row_; // Order and row.
     bool quit_ = false;
     bool pattern_focused_ = false;
     bool scroll_to_cursor_ = true;

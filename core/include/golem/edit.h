@@ -47,6 +47,15 @@ std::optional<std::uint8_t> note_for_key(
 // Value of a hex digit key (0-9, a-f, A-F), else std::nullopt.
 std::optional<std::uint8_t> hex_digit(char key);
 
+// A song that plays `note` (1..72) with `instrument` (1..15, clamped) on `channel` (0..3), and
+// nothing else, to preview a note: the instruments and waves of `song`, one order, and the
+// note on the first row of the channel's pattern, with 256 ticks per row.
+Song preview_song(
+    const Song& song,
+    std::size_t channel,
+    std::uint8_t note,
+    std::uint8_t instrument);
+
 // A song being edited.
 class Document {
 public:

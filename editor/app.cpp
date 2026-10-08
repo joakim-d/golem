@@ -18,6 +18,8 @@ namespace {
 
     constexpr int kPageRows = 16;
     constexpr int kBeatRows = 4;
+    constexpr Uint64 kMaxPreviewMs = 3000;
+    const ImU32 kPlayingRowColor = IM_COL32(60, 140, 90, 110);
     constexpr float kSidePanelWidth = 310;
     constexpr float kWaveBarWidth = 8; // Wave canvas: one bar per sample...
     constexpr float kWaveStepHeight = 8; // ...and this much per value step.
@@ -94,9 +96,20 @@ bool App::quit_requested() const
     return quit_;
 }
 
-LivePlayer& App::player()
+void App::render_audio(
+    StereoSample* samples,
+    std::size_t count)
 {
-    return player_;
+    player_.render(samples, count);
+    static thread_local std::vector<StereoSample> preview;
+    preview.resize(count);
+    preview_.render(preview.data(), count);
+    mix_into(samples, preview.data(), count);
+}
+
+void App::set_audio_latency(std::size_t samples)
+{
+    audio_latency_ = samples;
 }
 
 // --- Actions ---
@@ -182,6 +195,29 @@ void SDLCALL App::on_dialog(
     app->dialog_result_->second = files[0];
 }
 
+void App::start_preview(
+    std::uint8_t note,
+    SDL_Scancode key)
+{
+    if (!playback_unavailable_reason().empty()) {
+        return;
+    }
+    try {
+        preview_.play(
+            edit::preview_song(doc_.song(), doc_.cursor().channel, note, doc_.instrument()));
+        preview_key_ = key;
+        preview_started_ = SDL_GetTicks();
+    } catch (const std::exception&) {
+        stop_preview(); // A preview is a courtesy: entering the note is what matters.
+    }
+}
+
+void App::stop_preview()
+{
+    preview_.stop();
+    preview_key_.reset();
+}
+
 void App::toggle_playback()
 {
     if (player_.is_playing()) {
@@ -202,6 +238,10 @@ void App::handle_event(const SDL_Event& event)
 {
     if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
         request(Pending::Quit);
+        return;
+    }
+    if (event.type == SDL_EVENT_KEY_UP && preview_key_ == event.key.scancode) {
+        stop_preview();
         return;
     }
     if (event.type != SDL_EVENT_KEY_DOWN) {
@@ -298,7 +338,11 @@ void App::handle_pattern_key(const SDL_KeyboardEvent& key)
             return;
         }
         if (const auto c = qwerty_char(key.scancode)) {
+            const auto note = edit::note_for_key(*c, doc_.octave());
             doc_.enter_key(*c); // Keys that are not notes change nothing.
+            if (note && !key.repeat) {
+                start_preview(*note, key.scancode);
+            }
         }
         return;
     }
@@ -334,6 +378,10 @@ void App::draw()
                 fail(std::string("Cannot save:\n") + e.what());
             }
         }
+    }
+
+    if (preview_key_ && SDL_GetTicks() - preview_started_ > kMaxPreviewMs) {
+        stop_preview();
     }
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -407,6 +455,9 @@ void App::draw_toolbar()
     if (!unavailable.empty()) {
         ImGui::SetItemTooltip("Playback is unavailable: %s", unavailable.c_str());
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("Follow", &follow_);
+    ImGui::SetItemTooltip("While playing, show the playing order and scroll with its rows");
 
     ImGui::SameLine();
     ImGui::SetNextItemWidth(90);
@@ -735,8 +786,24 @@ void App::draw_pattern()
     ImGui::BeginChild("Pattern", ImVec2(0, 0), ImGuiChildFlags_Borders);
     // The table's rows scroll in a child window of their own, which a click focuses.
     pattern_focused_ = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
+
+    // The row being heard, and Follow: show its order, and scroll when it changes.
+    const auto playing = player_.position(audio_latency_);
+    bool scroll_to_playing = false;
+    if (playing && follow_ && playing->order < doc_.song().orders.size()) {
+        if (playing->order != doc_.cursor().order) {
+            doc_.set_order(playing->order);
+        }
+        const auto heard = std::make_pair(playing->order, playing->row);
+        scroll_to_playing = followed_row_ != heard;
+        followed_row_ = heard;
+    } else {
+        followed_row_.reset();
+    }
+
     const auto& cursor = doc_.cursor();
     const auto& order = doc_.song().orders[cursor.order];
+    const bool shows_playing_order = playing && playing->order == cursor.order;
 
     if (ImGui::BeginTable("Rows", 1 + int(kChannels), ImGuiTableFlags_ScrollY)) {
         ImGui::TableSetupScrollFreeze(0, 1);
@@ -754,11 +821,18 @@ void App::draw_pattern()
                 ImGui::TableSetBgColor(
                     ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiCol_TableRowBgAlt));
             }
+            const bool is_playing_row = shows_playing_order && row == playing->row;
+            if (is_playing_row) {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, kPlayingRowColor);
+            }
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(hex(unsigned(row), 2).c_str());
             if (row == cursor.row && scroll_to_cursor_) {
                 ImGui::SetScrollHereY();
                 scroll_to_cursor_ = false;
+            }
+            if (is_playing_row && scroll_to_playing) {
+                ImGui::SetScrollHereY();
             }
             for (std::size_t channel = 0; channel < kChannels; ++channel) {
                 ImGui::TableNextColumn();

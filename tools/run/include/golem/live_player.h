@@ -1,12 +1,14 @@
 #pragma once
 
 #include "golem/audio.h"
+#include "golem/player.h"
 #include "golem/song.h"
 #include "golem/wav.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,6 +41,12 @@ public:
     void play(const Song& song);
     void stop();
     bool is_playing() const;
+
+    // While playing: where the song is at the sample `latency` samples before the last one
+    // rendered, i.e. what is heard while `latency` samples wait in the audio output. The
+    // reference player follows the driver frame by frame, by the player ROM's frame markers.
+    // Order 0, row 0, tick 0 before the first row; std::nullopt when not playing.
+    std::optional<Player::Position> position(std::size_t latency = 0) const;
 
     // Fills `samples` with the next `count` samples: the song while playing, else silence.
     void render(
