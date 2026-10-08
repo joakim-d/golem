@@ -1,6 +1,7 @@
 add_library(golem_core
   src/apu.cpp
   src/edit.cpp
+  src/instrument_fields.cpp
   src/notes.cpp
   src/player.cpp
   src/song.cpp

@@ -2,6 +2,7 @@
 
 #include "keys.h"
 
+#include "golem/instrument_fields.h"
 #include "golem/song_text.h"
 
 #include <imgui.h>
@@ -17,6 +18,13 @@ namespace {
 
     constexpr int kPageRows = 16;
     constexpr int kBeatRows = 4;
+    constexpr float kSidePanelWidth = 310;
+    constexpr float kWaveBarWidth = 8; // Wave canvas: one bar per sample...
+    constexpr float kWaveStepHeight = 8; // ...and this much per value step.
+    const char* const kDuties[] = {"12.5%", "25%", "50%", "75%"};
+    const char* const kWaveVolumes[] = {"Mute", "100%", "50%", "25%"};
+    const char* const kEnvelopeDirections[] = {"Down", "Up"};
+    const char* const kLfsrWidths[] = {"15-bit (noise)", "7-bit (metallic)"};
     const SDL_DialogFileFilter kSongFilter = {"Golem songs", "gsong"};
 
     std::string hex(
@@ -341,11 +349,14 @@ void App::draw()
             | ImGuiWindowFlags_NoBringToFrontOnFocus);
     draw_toolbar();
     ImGui::Separator();
-    draw_orders();
+    draw_side_panel();
     ImGui::SameLine();
     draw_pattern();
     ImGui::End();
     draw_popups();
+    if (!ImGui::IsAnyItemActive()) {
+        doc_.finish_edit(); // A slider drag or a wave drawing ends with the mouse button.
+    }
     update_title();
 }
 
@@ -428,10 +439,35 @@ void App::draw_toolbar()
     }
 }
 
+void App::draw_side_panel()
+{
+    ImGui::BeginChild("Side", ImVec2(kSidePanelWidth, 0), ImGuiChildFlags_Borders);
+    if (ImGui::BeginTabBar("SideTabs")) {
+        const auto tab = [this](const char* label, SideTab which) {
+            const bool select = select_tab_ == which;
+            return ImGui::BeginTabItem(
+                label, nullptr, select ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None);
+        };
+        if (tab("Orders", SideTab::Orders)) {
+            draw_orders();
+            ImGui::EndTabItem();
+        }
+        if (tab("Instruments", SideTab::Instruments)) {
+            draw_instruments();
+            ImGui::EndTabItem();
+        }
+        if (tab("Waves", SideTab::Waves)) {
+            draw_waves();
+            ImGui::EndTabItem();
+        }
+        select_tab_.reset();
+        ImGui::EndTabBar();
+    }
+    ImGui::EndChild();
+}
+
 void App::draw_orders()
 {
-    ImGui::BeginChild("Orders", ImVec2(230, 0), ImGuiChildFlags_Borders);
-    ImGui::TextUnformatted("Orders");
     if (ImGui::Button("Insert")) {
         doc_.insert_order();
     }
@@ -476,13 +512,229 @@ void App::draw_orders()
             doc_.set_order(i);
         }
     }
-    ImGui::EndChild();
+}
+
+// --- Instruments and waves ---
+
+void App::draw_instruments()
+{
+    int type = static_cast<int>(instrument_type_);
+    ImGui::RadioButton("Pulse", &type, static_cast<int>(InstrumentType::Pulse));
+    ImGui::SameLine();
+    ImGui::RadioButton("Wave", &type, static_cast<int>(InstrumentType::Wave));
+    ImGui::SameLine();
+    ImGui::RadioButton("Noise", &type, static_cast<int>(InstrumentType::Noise));
+    instrument_type_ = static_cast<InstrumentType>(type);
+    ImGui::TextDisabled("Ch1-2 play pulse, Ch3 wave, Ch4 noise");
+
+    ImGui::SetNextItemWidth(100);
+    int instrument = doc_.instrument();
+    if (ImGui::InputInt("Instrument", &instrument)) {
+        doc_.set_instrument(static_cast<std::uint8_t>(std::clamp(instrument, 1, 15)));
+    }
+    ImGui::SetItemTooltip("Also the instrument given to the notes you enter");
+    ImGui::Separator();
+
+    ImGui::PushItemWidth(150);
+    switch (instrument_type_) {
+    case InstrumentType::Pulse:
+        draw_pulse_instrument();
+        break;
+    case InstrumentType::Wave:
+        draw_wave_instrument();
+        break;
+    case InstrumentType::Noise:
+        draw_noise_instrument();
+        break;
+    }
+    ImGui::PopItemWidth();
+}
+
+namespace {
+
+    // The envelope widgets shared by pulse and noise instruments; true when one changed.
+    bool envelope_widgets(
+        int& volume,
+        bool& increase,
+        int& pace)
+    {
+        bool changed = ImGui::SliderInt("Volume", &volume, 0, 15);
+        int direction = increase ? 1 : 0;
+        if (ImGui::Combo("Envelope", &direction, kEnvelopeDirections, 2)) {
+            increase = direction == 1;
+            changed = true;
+        }
+        changed |= ImGui::SliderInt("Envelope pace", &pace, 0, 7);
+        ImGui::SetItemTooltip("Frames of 1/64 s per volume step; 0 holds the volume");
+        return changed;
+    }
+
+    // Length enable and timer; the note lasts (max + 1 - timer) / 256 s.
+    bool length_widgets(
+        bool& enable,
+        int& length,
+        int max)
+    {
+        bool changed = ImGui::Checkbox("Length", &enable);
+        ImGui::BeginDisabled(!enable);
+        changed |= ImGui::SliderInt("Length timer", &length, 0, max);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%.0f ms", (max + 1 - length) * 1000.0 / 256.0);
+        ImGui::EndDisabled();
+        return changed;
+    }
+
+} // namespace
+
+void App::draw_pulse_instrument()
+{
+    const std::uint8_t number = doc_.instrument();
+    edit::PulseFields fields = edit::pulse_fields(doc_.song().pulse_instruments[number - 1]);
+    bool changed = ImGui::Combo("Duty", &fields.duty, kDuties, 4);
+    changed |= envelope_widgets(fields.volume, fields.envelope_increase, fields.envelope_pace);
+    changed |= length_widgets(fields.length_enable, fields.length, 63);
+    ImGui::SeparatorText("Sweep (channel 1 only)");
+    changed |= ImGui::SliderInt("Sweep pace", &fields.sweep_pace, 0, 7);
+    ImGui::SetItemTooltip("Frames of 1/128 s per pitch step; 0 is no sweep");
+    changed |= ImGui::Checkbox("Sweep down", &fields.sweep_decrease);
+    changed |= ImGui::SliderInt("Sweep steps", &fields.sweep_steps, 0, 7);
+    ImGui::SetItemTooltip("Each step moves the period by 1/2^steps of itself: higher is finer");
+    if (changed) {
+        doc_.set_pulse_instrument(number, edit::pulse_instrument(fields));
+    }
+}
+
+void App::draw_wave_instrument()
+{
+    const std::uint8_t number = doc_.instrument();
+    edit::WaveFields fields = edit::wave_fields(doc_.song().wave_instruments[number - 1]);
+    bool changed = ImGui::Combo("Volume", &fields.volume, kWaveVolumes, 4);
+    changed |= ImGui::SliderInt("Wave", &fields.wave, 0, int(kWaves) - 1);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Edit")) {
+        wave_ = fields.wave;
+        select_tab_ = SideTab::Waves;
+    }
+    changed |= length_widgets(fields.length_enable, fields.length, 255);
+    if (changed) {
+        doc_.set_wave_instrument(number, edit::wave_instrument(fields));
+    }
+}
+
+void App::draw_noise_instrument()
+{
+    const std::uint8_t number = doc_.instrument();
+    edit::NoiseFields fields = edit::noise_fields(doc_.song().noise_instruments[number - 1]);
+    int lfsr = fields.short_lfsr ? 1 : 0;
+    bool changed = false;
+    if (ImGui::Combo("LFSR", &lfsr, kLfsrWidths, 2)) {
+        fields.short_lfsr = lfsr == 1;
+        changed = true;
+    }
+    changed |= envelope_widgets(fields.volume, fields.envelope_increase, fields.envelope_pace);
+    changed |= length_widgets(fields.length_enable, fields.length, 63);
+    if (changed) {
+        doc_.set_noise_instrument(number, edit::noise_instrument(fields));
+    }
+}
+
+void App::draw_waves()
+{
+    ImGui::SetNextItemWidth(150);
+    ImGui::SliderInt("Wave", &wave_, 0, int(kWaves) - 1);
+    const auto wave = static_cast<std::uint8_t>(wave_);
+    draw_wave_canvas();
+
+    // The wave as hex, edited in place and applied with Enter.
+    if (!wave_hex_editing_) {
+        const std::string text = edit::wave_hex(doc_.song().waves[wave]);
+        std::snprintf(wave_hex_edit_, sizeof wave_hex_edit_, "%s", text.c_str());
+    }
+    ImGui::SetNextItemWidth(kSidePanelWidth - 70);
+    if (ImGui::InputText(
+            "##hex",
+            wave_hex_edit_,
+            sizeof wave_hex_edit_,
+            ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_EnterReturnsTrue)) {
+        const auto parsed = edit::parse_wave_hex(wave_hex_edit_);
+        wave_hex_invalid_ = !parsed;
+        if (parsed) {
+            doc_.set_wave(wave, *parsed);
+        }
+    }
+    wave_hex_editing_ = ImGui::IsItemActive();
+    ImGui::SetItemTooltip("32 hex digits, one per sample; Enter applies them");
+    ImGui::SameLine();
+    if (ImGui::Button("Copy")) {
+        ImGui::SetClipboardText(edit::wave_hex(doc_.song().waves[wave]).c_str());
+    }
+    if (wave_hex_invalid_) {
+        ImGui::TextColored(ImVec4(1, 0.4F, 0.4F, 1), "Needs exactly 32 hex digits");
+    }
+
+    ImGui::TextUnformatted("Presets");
+    const std::pair<const char*, edit::WavePreset> presets[] = {
+        {"Square", edit::WavePreset::Square},
+        {"Saw", edit::WavePreset::Saw},
+        {"Triangle", edit::WavePreset::Triangle},
+        {"Sine", edit::WavePreset::Sine},
+    };
+    for (const auto& [label, preset] : presets) {
+        if (label != presets[0].first) {
+            ImGui::SameLine();
+        }
+        if (ImGui::Button(label)) {
+            doc_.set_wave(wave, edit::wave_preset(preset));
+        }
+    }
+}
+
+void App::draw_wave_canvas()
+{
+    const auto wave = static_cast<std::uint8_t>(wave_);
+    const ImVec2 size(kWaveBarWidth * edit::kWaveSamples, kWaveStepHeight * 16);
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("canvas", size);
+    ImGui::SetItemTooltip("Click or drag to draw the wave");
+
+    if (ImGui::IsItemActive()) {
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        const int sample = std::clamp(
+            static_cast<int>((mouse.x - origin.x) / kWaveBarWidth), 0, int(edit::kWaveSamples) - 1);
+        const int value =
+            std::clamp(15 - static_cast<int>((mouse.y - origin.y) / kWaveStepHeight), 0, 15);
+        // Fill the samples between this frame and the last, for a quick stroke.
+        const auto [from, from_value] = last_drawn_.value_or(std::make_pair(sample, value));
+        const int steps = std::abs(sample - from);
+        for (int i = 0; i <= steps; ++i) {
+            const int at = from + (sample > from ? i : -i);
+            const int at_value = steps == 0 ? value : from_value + (value - from_value) * i / steps;
+            doc_.set_wave_sample(
+                wave, static_cast<std::size_t>(at), static_cast<std::uint8_t>(at_value));
+        }
+        last_drawn_ = std::make_pair(sample, value);
+    } else {
+        last_drawn_.reset();
+    }
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImVec2 end(origin.x + size.x, origin.y + size.y);
+    draw->AddRectFilled(origin, end, ImGui::GetColorU32(ImGuiCol_FrameBg));
+    const ImU32 bar = ImGui::GetColorU32(ImGuiCol_PlotHistogram);
+    for (std::size_t i = 0; i < edit::kWaveSamples; ++i) {
+        const int value = edit::wave_sample(doc_.song().waves[wave], i);
+        const float x = origin.x + kWaveBarWidth * static_cast<float>(i);
+        const float top = origin.y + kWaveStepHeight * static_cast<float>(15 - value);
+        draw->AddRectFilled(ImVec2(x + 1, top), ImVec2(x + kWaveBarWidth - 1, end.y), bar);
+    }
+    draw->AddRect(origin, end, ImGui::GetColorU32(ImGuiCol_Border));
 }
 
 void App::draw_pattern()
 {
     ImGui::BeginChild("Pattern", ImVec2(0, 0), ImGuiChildFlags_Borders);
-    pattern_focused_ = ImGui::IsWindowFocused();
+    // The table's rows scroll in a child window of their own, which a click focuses.
+    pattern_focused_ = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
     const auto& cursor = doc_.cursor();
     const auto& order = doc_.song().orders[cursor.order];
 

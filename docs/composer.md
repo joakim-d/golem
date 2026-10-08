@@ -21,13 +21,14 @@ Playback needs a build with SameBoy (GCC or Clang) and RGBDS. Without them, the 
   - **Edit step** is how many rows the cursor moves down after each entry (0 stays in place).
   - **Instrument** is the instrument given to the notes you enter.
   - **Ticks per row** is the song's speed: frames per row, 6 by default. Lower is faster.
-- **Orders** (left): the song plays its orders from top to bottom, then starts over. Each order picks one pattern per channel (shown in hex).
+- **Orders** (left panel, first tab): the song plays its orders from top to bottom, then starts over. Each order picks one pattern per channel (shown in hex).
   - **Insert** adds a copy of the selected order after it.
   - **Remove** deletes it (one order always remains).
   - **Pattern** sets the pattern of the cursor's channel in the selected order (type a hex number, then Enter).
   - **New** gives that channel a new empty pattern.
 
   Patterns are shared: editing a pattern changes it wherever it is used.
+- **Instruments** and **Waves** (left panel, other tabs): see [Instruments and waves](#instruments-and-waves).
 - **Pattern** (right): the 64 rows of the selected order, one column per channel. A cell reads `C-4 1 C0F`: note, instrument, effect code and its two-digit parameter. `---` and `.` mean empty. Click a field to put the cursor there; every 4th row is shaded.
 
 ## Keys (while the pattern has the focus)
@@ -67,6 +68,31 @@ The note gets the current instrument. `1` enters a note off (effect `C00`: volum
 
 On macOS, Cmd works like Ctrl. Undo and redo cover every change to the song, and put the cursor back where it was. The window title shows the file name, with `*` while there are unsaved changes. New, Open and Quit ask before discarding them.
 
+## Instruments and waves
+
+Each channel type has its own 15 instruments: channels 1 and 2 play **pulse** instruments, channel 3 **wave** instruments, and channel 4 **noise** instruments. Instrument 3 on channel 1 and instrument 3 on channel 4 are two different instruments.
+
+The **Instruments** tab edits instrument *n* of the chosen type, where *n* is the current instrument (the same number as in the toolbar):
+- **Pulse**
+  - **Duty**: the pulse width, 12.5%, 25%, 50% or 75%. It changes the timbre, from thin to round.
+  - **Volume**, **Envelope** and **Envelope pace**: the starting volume (0–15), then whether it goes down or up, by one step every *pace* 64ths of a second. Pace 0 holds the volume.
+  - **Length**: when ticked, the note stops by itself after the time shown next to the timer.
+  - **Sweep** (channel 1 only): slides the pitch up or down. **Sweep pace** is the time between steps, in 128ths of a second (0 means no sweep). **Sweep steps** sets how far each step moves the pitch: the higher the value, the smaller the move.
+- **Wave**
+  - **Volume**: mute, 100%, 50% or 25%.
+  - **Wave**: which of the 16 waves the instrument plays. **Edit** opens it in the Waves tab.
+  - **Length**, as for pulse instruments.
+- **Noise**
+  - **LFSR**: 15-bit is a hiss, 7-bit a more metallic, pitched noise.
+  - **Volume**, **Envelope**, **Envelope pace** and **Length**, as for pulse instruments.
+
+The **Waves** tab edits the 16 waves that wave instruments play. A wave is 32 samples from 0 to 15, played in a loop:
+- click or drag over the bars to draw it;
+- the hex line shows the 32 samples as hex digits: copy it, or type or paste one and press Enter;
+- **Square**, **Saw**, **Triangle** and **Sine** replace the wave with a preset.
+
+Changes are heard the next time you press Play. Undo takes back a whole slider drag or a whole wave drawing at once.
+
 ## Effects
 
 The effect column takes the 16 effects of the [song format](song-format.md). The driver's exact behaviour is in the [driver contract](driver-contract.md).
@@ -80,7 +106,6 @@ The effect column takes the 16 effects of the [song format](song-format.md). The
 
 ## Not yet
 
-- Editing instruments and waves (a song's instruments can be edited in the `.gsong` file for now).
 - Playing from the cursor, and hearing edits while the song plays.
 - Selection and copy/paste.
 - Exporting a ROM or a WAV from the editor (`golem-wav` renders a driver test ROM).
