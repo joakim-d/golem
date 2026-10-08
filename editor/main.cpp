@@ -69,7 +69,7 @@ int main(
     }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        std::fprintf(stderr, "golem-editor: %s\n", SDL_GetError());
+        std::fprintf(stderr, "golem-editor: cannot start SDL video: %s\n", SDL_GetError());
         return 1;
     }
     const bool has_audio = SDL_InitSubSystem(SDL_INIT_AUDIO);
@@ -79,9 +79,19 @@ int main(
 
     SDL_Window* window =
         SDL_CreateWindow("Golem", 1200, 800, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-    SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, nullptr) : nullptr;
+    if (window == nullptr) {
+        std::fprintf(stderr, "golem-editor: cannot create the window: %s\n", SDL_GetError());
+        return 1;
+    }
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
     if (renderer == nullptr) {
-        std::fprintf(stderr, "golem-editor: %s\n", SDL_GetError());
+        // No accelerated renderer (e.g. offscreen video on some systems): draw in software.
+        std::fprintf(
+            stderr, "golem-editor: no accelerated renderer (%s), using software\n", SDL_GetError());
+        renderer = SDL_CreateRenderer(window, SDL_SOFTWARE_RENDERER);
+    }
+    if (renderer == nullptr) {
+        std::fprintf(stderr, "golem-editor: cannot create a renderer: %s\n", SDL_GetError());
         return 1;
     }
     SDL_SetRenderVSync(renderer, 1);
