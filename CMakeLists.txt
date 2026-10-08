@@ -23,9 +23,18 @@ endif()
 include(peanut_gb)
 include(sameboy)
 
+option(GOLEM_EDITOR "Build the editor (golem-editor), with SDL3 and Dear ImGui" ON)
+if(GOLEM_EDITOR)
+  include(sdl3)
+  include(imgui)
+endif()
+
 add_subdirectory(core)
 add_subdirectory(driver)
 add_subdirectory(tools)
+if(GOLEM_EDITOR)
+  add_subdirectory(editor)
+endif()
 
 # clang-format targets: `format` rewrites sources, `format-check` fails on diffs.
 find_program(CLANG_FORMAT clang-format)
@@ -34,7 +43,9 @@ if(CLANG_FORMAT)
     ${PROJECT_SOURCE_DIR}/core/*.cpp
     ${PROJECT_SOURCE_DIR}/core/*.h
     ${PROJECT_SOURCE_DIR}/tools/*.cpp
-    ${PROJECT_SOURCE_DIR}/tools/*.h)
+    ${PROJECT_SOURCE_DIR}/tools/*.h
+    ${PROJECT_SOURCE_DIR}/editor/*.cpp
+    ${PROJECT_SOURCE_DIR}/editor/*.h)
   add_custom_target(format
     COMMAND ${CLANG_FORMAT} -i ${GOLEM_FORMAT_SOURCES}
     COMMENT "Running clang-format")

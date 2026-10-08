@@ -283,6 +283,21 @@ TEST(
     EXPECT_EQ(doc.cursor().channel, 3u);
 }
 
+TEST(
+    Edit,
+    SetCursorIsClamped)
+{
+    Document doc;
+    doc.insert_order();
+    doc.set_cursor(at(1, 10, 2, Column::Effect));
+    EXPECT_EQ(doc.cursor(), at(1, 10, 2, Column::Effect));
+    doc.set_cursor(at(5, 99, 9, Column::ParamLow));
+    EXPECT_EQ(doc.cursor(), at(1, 63, 3, Column::ParamLow));
+    doc.undo(); // Undoes insert_order: moving the cursor added no undo step.
+    EXPECT_EQ(doc.song().orders.size(), 1u);
+    EXPECT_FALSE(doc.can_undo());
+}
+
 // --- Orders and patterns ---
 
 TEST(

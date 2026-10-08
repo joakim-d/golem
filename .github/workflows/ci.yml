@@ -27,10 +27,14 @@ jobs:
       - name: Report build and test errors as annotations
         run: echo "::add-matcher::.github/problem-matchers.json"
 
-      - name: Install Ninja, clang-format and RGBDS
+      - name: Install Ninja, SDL's Linux dependencies, clang-format and RGBDS
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build
+          # Ninja, and what SDL3 needs for windows and sound on Linux (the editor).
+          sudo apt-get install -y ninja-build \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev \
+            libxss-dev libxkbcommon-dev libwayland-dev wayland-protocols libegl1-mesa-dev \
+            libgl1-mesa-dev libasound2-dev libpulse-dev libdbus-1-dev libudev-dev
           pipx install "clang-format==${CLANG_FORMAT_VERSION}"
           # Searched before PATH by find_program(), so the pinned clang-format wins.
           echo "CMAKE_PROGRAM_PATH=$(pipx environment --value PIPX_BIN_DIR)" >> "$GITHUB_ENV"
