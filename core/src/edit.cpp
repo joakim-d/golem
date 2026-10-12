@@ -91,6 +91,23 @@ std::optional<std::uint8_t> hex_digit(char key)
     return std::nullopt;
 }
 
+Song preview_song(
+    const Song& song,
+    std::size_t channel,
+    std::uint8_t note,
+    std::uint8_t instrument)
+{
+    Song preview = song;
+    preview.ticks_per_row = 0; // 256 ticks
+    preview.patterns.assign(2, Pattern {}); // 0: empty, 1: the note.
+    Order order {0, 0, 0, 0};
+    order[std::min(channel, kChannels - 1)] = 1;
+    preview.orders = {order};
+    preview.patterns[1][0] =
+        Cell {note, static_cast<std::uint8_t>(instrument_index(instrument) + 1), 0, 0};
+    return preview;
+}
+
 Document::Document()
     : Document(new_song())
 {

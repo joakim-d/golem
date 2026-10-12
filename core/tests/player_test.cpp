@@ -1337,3 +1337,80 @@ TEST(
     frames = render(make_song(two_orders("00 --- . D40\n")), 3);
     EXPECT_EQ(position(frames[2]), (std::pair {1, 0}));
 }
+
+// --- Position ---
+
+namespace {
+
+using Position = Player::Position;
+
+// Positions of frames 1..frames (frame 0 is init).
+std::vector<Position> positions_of(
+    const std::string& text,
+    std::size_t frames)
+{
+    Player player(make_song(text));
+    player.step();
+    std::vector<Position> positions;
+    for (std::size_t frame = 1; frame <= frames; ++frame) {
+        player.step();
+        positions.push_back(player.position());
+    }
+    return positions;
+}
+
+} // namespace
+
+TEST(
+    Player,
+    PositionBeforeTheFirstRow)
+{
+    Player player(make_song(on_channel(1, "")));
+    EXPECT_EQ(player.position(), Position {});
+    player.step(); // Init
+    EXPECT_EQ(player.position(), Position {});
+}
+
+TEST(
+    Player,
+    PositionFollowsRowsAndTicks)
+{
+    const auto positions = positions_of(on_channel(1, "", "03"), 4);
+    EXPECT_EQ(positions, (std::vector<Position> {{0, 0, 0}, {0, 0, 1}, {0, 0, 2}, {0, 1, 0}}));
+}
+
+TEST(
+    Player,
+    PositionGoesThroughOrdersAndLoops)
+{
+    const std::string song = "ticks_per_row 01\norder 00 00 00 00\norder 00 00 00 00\npattern 00\n";
+    const auto positions = positions_of(song, 129);
+    EXPECT_EQ(positions[63], (Position {0, 63, 0})); // Frame 64
+    EXPECT_EQ(positions[64], (Position {1, 0, 0}));
+    EXPECT_EQ(positions[127], (Position {1, 63, 0}));
+    EXPECT_EQ(positions[128], (Position {0, 0, 0})); // Back to the first order.
+}
+
+TEST(
+    Player,
+    PositionFollowsBreaksTempoAndJumps)
+{
+    // D05 goes to order 1 row 05, whose F04 makes the next row last 4 ticks; B00 then goes back.
+    const std::string song = "ticks_per_row 02\n"
+                             "order 01 00 00 00\norder 02 00 00 00\n"
+                             "pattern 00\n"
+                             "pattern 01\n00 --- . D05\n"
+                             "pattern 02\n05 --- . F04\n06 --- . B00\n";
+    EXPECT_EQ(
+        positions_of(song, 9),
+        (std::vector<Position> {
+            {0, 0, 0},
+            {0, 0, 1},
+            {1, 5, 0},
+            {1, 5, 1},
+            {1, 6, 0},
+            {1, 6, 1},
+            {1, 6, 2},
+            {1, 6, 3},
+            {0, 0, 0}}));
+}

@@ -86,6 +86,7 @@ std::vector<ApuWrite> Player::step()
     if (frame_ == 0) {
         init();
     } else {
+        position_ = Position {order_, row_, tick_};
         if (tick_ == 0) {
             row_length_ = ticks_per_row_;
             for (auto& channel : channels_) {
@@ -144,6 +145,16 @@ std::vector<ApuWrite> Player::step()
     }
     ++frame_;
     return std::move(writes_);
+}
+
+bool Player::Position::operator==(const Position& other) const
+{
+    return order == other.order && row == other.row && tick == other.tick;
+}
+
+Player::Position Player::position() const
+{
+    return position_;
 }
 
 void Player::init()

@@ -6,6 +6,7 @@
 #include "sameboy_core.h"
 #endif
 
+#include <algorithm>
 #include <memory>
 
 namespace golem {
@@ -32,6 +33,19 @@ namespace {
 #endif
 
 } // namespace
+
+void mix_into(
+    StereoSample* into,
+    const StereoSample* from,
+    std::size_t count)
+{
+    const auto add = [](std::int16_t a, std::int16_t b) {
+        return static_cast<std::int16_t>(std::clamp(int {a} + int {b}, -32768, 32767));
+    };
+    for (std::size_t i = 0; i < count; ++i) {
+        into[i] = {add(into[i].left, from[i].left), add(into[i].right, from[i].right)};
+    }
+}
 
 std::vector<StereoSample> render_audio(
     const std::vector<std::uint8_t>& rom,

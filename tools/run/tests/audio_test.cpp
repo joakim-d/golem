@@ -51,6 +51,16 @@ int peak(const std::vector<StereoSample>& samples)
 
 } // namespace
 
+TEST(
+    Audio,
+    MixAddsAndSaturates)
+{
+    std::vector<StereoSample> into {{100, -100}, {30000, -30000}, {-32768, 32767}};
+    const std::vector<StereoSample> from {{20, 30}, {10000, -10000}, {-1, 1}};
+    mix_into(into.data(), from.data(), into.size());
+    EXPECT_EQ(into, (std::vector<StereoSample> {{120, -70}, {32767, -32768}, {-32768, 32767}}));
+}
+
 #ifdef GOLEM_HAS_SAMEBOY
 
 TEST(
