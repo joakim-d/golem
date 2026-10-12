@@ -130,6 +130,11 @@ private:
     std::optional<std::uint8_t> loaded_wave_;
 };
 
+// Frames of one pass of `song`: from frame 1 until playback reaches the start of a row it has
+// already played (the loop point), which every song does. Throws SongError if the song is
+// invalid.
+std::uint32_t song_length(const Song& song);
+
 // Writes of frames 0..frames-1 (frame 0 is init).
 std::vector<std::vector<ApuWrite>> render(
     const Song& song,

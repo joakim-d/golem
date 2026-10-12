@@ -71,6 +71,15 @@ You hear each note as you enter it: the driver plays it with the current instrum
 
 On macOS, Cmd works like Ctrl. Undo and redo cover every change to the song, and put the cursor back where it was. The window title shows the file name, with `*` while there are unsaved changes. New, Open and Quit ask before discarding them.
 
+## Exporting
+
+The File menu takes a song out of the editor:
+- **Export ROM** writes a Game Boy ROM (`.gb`) that plays the song from power-on, forever, with the Golem driver. Play it in an emulator or on a Game Boy flash cartridge.
+- **Export WAV** writes a 16-bit stereo WAV of the song, as SameBoy plays it. Choose 1 to 4 passes. A pass ends where the song loops: if it jumps back to a later order, the orders before it are an intro, played once. A 2-second tail lets the last notes ring. The WAV renders in the background, and a message says where it went.
+- **Export Binary Song** writes the song as the driver reads it (`.bin`, laid out for address `$4000`), to build into a game with the driver. `golem-encode` makes the same file from a `.gsong`.
+
+Export ROM and Export WAV need a build with playback, as Play does.
+
 ## Instruments and waves
 
 Each channel type has its own 15 instruments: channels 1 and 2 play **pulse** instruments, channel 3 **wave** instruments, and channel 4 **noise** instruments. Instrument 3 on channel 1 and instrument 3 on channel 4 are two different instruments.
@@ -111,4 +120,3 @@ The effect column takes the 16 effects of the [song format](song-format.md). The
 
 - Playing from the cursor, and hearing edits while the song plays (edits are heard on the next Play).
 - Selection and copy/paste.
-- Exporting a ROM or a WAV from the editor (`golem-wav` renders a driver test ROM).

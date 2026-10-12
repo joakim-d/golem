@@ -541,6 +541,27 @@ void Player::write(
     writes_.push_back({address, value});
 }
 
+std::uint32_t song_length(const Song& song)
+{
+    Player player(song);
+    player.step(); // Init
+    // Rows whose start was played, by order and row. There are finitely many, so a row
+    // starts a second time within orders * 64 rows.
+    std::vector<bool> started(song.orders.size() * kRowsPerPattern);
+    for (std::uint32_t frame = 1;; ++frame) {
+        player.step();
+        const Player::Position position = player.position();
+        if (position.tick != 0) {
+            continue;
+        }
+        const std::size_t row = position.order * kRowsPerPattern + position.row;
+        if (started[row]) {
+            return frame - 1;
+        }
+        started[row] = true;
+    }
+}
+
 std::vector<std::vector<ApuWrite>> render(
     const Song& song,
     std::size_t frames)
