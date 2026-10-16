@@ -1,6 +1,7 @@
 #include "golem/edit.h"
 
 #include "golem/instrument_fields.h"
+#include "golem/notes.h"
 #include "golem/player.h"
 #include "golem/song_text.h"
 
@@ -611,6 +612,471 @@ TEST(
     EXPECT_TRUE(doc.modified());
     doc.undo();
     EXPECT_TRUE(doc.modified()); // Back to the state before the step, not the saved one.
+}
+
+// --- Selection ---
+
+namespace {
+
+// Field index of a channel's field, counted across channels.
+std::size_t field(
+    std::size_t channel,
+    Field kind)
+{
+    return channel * kFieldsPerCell + static_cast<std::size_t>(kind);
+}
+
+// A cell that says where it is: note row + 1, instrument channel + 1, effect A, parameter row.
+Cell numbered(
+    std::size_t channel,
+    std::size_t row)
+{
+    return Cell {
+        static_cast<std::uint8_t>(row + 1),
+        static_cast<std::uint8_t>(channel + 1),
+        0xA,
+        static_cast<std::uint8_t>(row)};
+}
+
+// A new document's song (patterns 0-3 on channels 1-4) with every cell numbered.
+Document numbered_document()
+{
+    Song song = Document().song();
+    for (std::size_t channel = 0; channel < kChannels; ++channel) {
+        for (std::size_t row = 0; row < kRowsPerPattern; ++row) {
+            song.patterns[song.orders[0][channel]][row] = numbered(channel, row);
+        }
+    }
+    return Document(song);
+}
+
+const Cell& cell_at(
+    const Document& doc,
+    std::size_t channel,
+    std::size_t row)
+{
+    const Song& song = doc.song();
+    return song.patterns[song.orders[doc.cursor().order][channel]][row];
+}
+
+} // namespace
+
+TEST(
+    Edit,
+    FieldsOfColumns)
+{
+    EXPECT_EQ(field_of(Column::Note), Field::Note);
+    EXPECT_EQ(field_of(Column::Instrument), Field::Instrument);
+    EXPECT_EQ(field_of(Column::Effect), Field::Effect);
+    EXPECT_EQ(field_of(Column::ParamHigh), Field::Effect);
+    EXPECT_EQ(field_of(Column::ParamLow), Field::Effect);
+}
+
+TEST(
+    Edit,
+    SelectionContainsItsFields)
+{
+    const Selection selection {2, 5, field(1, Field::Instrument), field(2, Field::Note)};
+    EXPECT_TRUE(selection.contains(2, 1, Column::Instrument));
+    EXPECT_TRUE(selection.contains(5, 1, Column::ParamLow));
+    EXPECT_TRUE(selection.contains(3, 2, Column::Note));
+    EXPECT_FALSE(selection.contains(3, 1, Column::Note));
+    EXPECT_FALSE(selection.contains(3, 2, Column::Instrument));
+    EXPECT_FALSE(selection.contains(1, 1, Column::Instrument));
+    EXPECT_FALSE(selection.contains(6, 1, Column::Instrument));
+}
+
+TEST(
+    Edit,
+    NothingIsSelectedAtFirst)
+{
+    const Document doc;
+    EXPECT_EQ(doc.selection(), std::nullopt);
+}
+
+TEST(
+    Edit,
+    SelectingExtendsFromWhereTheCursorWas)
+{
+    Document doc;
+    doc.set_cursor(at(0, 2, 1, Column::Instrument));
+    doc.move_rows(3, true);
+    EXPECT_EQ(
+        doc.selection(),
+        (Selection {2, 5, field(1, Field::Instrument), field(1, Field::Instrument)}));
+    doc.move_columns(2, true); // Parameter: the effect field.
+    EXPECT_EQ(
+        doc.selection(), (Selection {2, 5, field(1, Field::Instrument), field(1, Field::Effect)}));
+    doc.move_columns(2, true); // Across to channel 3's note.
+    EXPECT_EQ(
+        doc.selection(), (Selection {2, 5, field(1, Field::Instrument), field(2, Field::Note)}));
+    EXPECT_EQ(doc.cursor(), at(0, 5, 2, Column::Note));
+}
+
+TEST(
+    Edit,
+    SelectingUpAndLeft)
+{
+    Document doc;
+    doc.set_cursor(at(0, 10, 2, Column::Effect));
+    doc.move_rows(-4, true);
+    doc.move_channels(-2, true);
+    EXPECT_EQ(
+        doc.selection(), (Selection {6, 10, field(0, Field::Effect), field(2, Field::Effect)}));
+    doc.move_rows(8, true); // Back past the anchor.
+    EXPECT_EQ(
+        doc.selection(), (Selection {10, 14, field(0, Field::Effect), field(2, Field::Effect)}));
+}
+
+TEST(
+    Edit,
+    SelectingWithTheMouse)
+{
+    Document doc;
+    doc.set_cursor(at(0, 1, 0, Column::Note));
+    doc.set_cursor(at(0, 4, 3, Column::ParamHigh), true);
+    EXPECT_EQ(doc.selection(), (Selection {1, 4, 0, field(3, Field::Effect)}));
+    doc.set_cursor(at(0, 0, 1, Column::Note), true); // The anchor stays.
+    EXPECT_EQ(doc.selection(), (Selection {0, 1, 0, field(1, Field::Note)}));
+}
+
+TEST(
+    Edit,
+    MovingWithoutSelectingClearsTheSelection)
+{
+    Document doc;
+    doc.move_rows(2, true);
+    doc.move_rows(1);
+    EXPECT_EQ(doc.selection(), std::nullopt);
+    doc.move_rows(2, true);
+    doc.set_cursor(at(0, 9, 0, Column::Note));
+    EXPECT_EQ(doc.selection(), std::nullopt);
+    doc.move_rows(2, true);
+    doc.clear_selection();
+    EXPECT_EQ(doc.selection(), std::nullopt);
+    doc.move_rows(2, true);
+    doc.enter_note(kC4); // Entries move the cursor too.
+    EXPECT_EQ(doc.selection(), std::nullopt);
+}
+
+TEST(
+    Edit,
+    SelectAllKeepsTheCursor)
+{
+    Document doc;
+    doc.set_cursor(at(0, 7, 2, Column::Instrument));
+    doc.select_all();
+    EXPECT_EQ(
+        doc.selection(), (Selection {0, kRowsPerPattern - 1, 0, kChannels * kFieldsPerCell - 1}));
+    EXPECT_EQ(doc.cursor(), at(0, 7, 2, Column::Instrument));
+}
+
+TEST(
+    Edit,
+    AnotherOrderClearsTheSelection)
+{
+    Document doc;
+    doc.insert_order();
+    doc.select_all();
+    doc.set_order(1); // The same order.
+    EXPECT_NE(doc.selection(), std::nullopt);
+    doc.set_order(0);
+    EXPECT_EQ(doc.selection(), std::nullopt);
+    doc.select_all();
+    doc.insert_order();
+    EXPECT_EQ(doc.selection(), std::nullopt);
+}
+
+TEST(
+    Edit,
+    UndoAndRedoClearTheSelection)
+{
+    Document doc;
+    doc.enter_note(kC4);
+    doc.select_all();
+    doc.undo();
+    EXPECT_EQ(doc.selection(), std::nullopt);
+    doc.select_all();
+    doc.redo();
+    EXPECT_EQ(doc.selection(), std::nullopt);
+}
+
+// --- Copy, cut, clear ---
+
+TEST(
+    Edit,
+    CopyTakesTheSelectedFields)
+{
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 1, 0, Column::Instrument));
+    doc.set_cursor(at(0, 2, 1, Column::Note), true);
+    const Clip clip = doc.copy();
+    EXPECT_EQ(clip.first_field, Field::Instrument);
+    EXPECT_EQ(clip.fields, 3u);
+    ASSERT_EQ(clip.rows.size(), 2u);
+    for (std::size_t row = 0; row < 2; ++row) {
+        ASSERT_EQ(clip.rows[row].size(), 2u);
+        const Cell first = numbered(0, row + 1);
+        const Cell second = numbered(1, row + 1);
+        EXPECT_EQ(clip.rows[row][0], (Cell {0, first.instrument, first.effect, first.param}));
+        EXPECT_EQ(clip.rows[row][1], (Cell {second.note, 0, 0, 0}));
+    }
+    EXPECT_FALSE(clip.empty());
+    EXPECT_FALSE(doc.can_undo()); // Not a change.
+    EXPECT_FALSE(doc.modified());
+}
+
+TEST(
+    Edit,
+    CopyWithoutASelectionTakesTheCursorCell)
+{
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 5, 2, Column::ParamLow));
+    const Clip clip = doc.copy();
+    EXPECT_EQ(clip.first_field, Field::Note);
+    EXPECT_EQ(clip.fields, kFieldsPerCell);
+    ASSERT_EQ(clip.rows.size(), 1u);
+    ASSERT_EQ(clip.rows[0].size(), 1u);
+    EXPECT_EQ(clip.rows[0][0], numbered(2, 5));
+}
+
+TEST(
+    Edit,
+    CutClearsWhatItCopies)
+{
+    Document doc = numbered_document();
+    const Song before = doc.song();
+    doc.set_cursor(at(0, 3, 1, Column::Effect));
+    doc.set_cursor(at(0, 4, 2, Column::Instrument), true);
+    const Clip clip = doc.cut();
+    EXPECT_EQ(clip.rows.size(), 2u);
+    EXPECT_EQ(clip.first_field, Field::Effect);
+    EXPECT_EQ(clip.fields, 3u);
+    for (std::size_t row = 3; row <= 4; ++row) {
+        EXPECT_EQ(cell_at(doc, 1, row), (Cell {numbered(1, row).note, 2, 0, 0}));
+        EXPECT_EQ(cell_at(doc, 2, row), (Cell {0, 0, 0xA, static_cast<std::uint8_t>(row)}));
+    }
+    EXPECT_EQ(cell_at(doc, 1, 5), numbered(1, 5));
+    EXPECT_EQ(doc.cursor(), at(0, 4, 2, Column::Instrument));
+    doc.undo();
+    EXPECT_EQ(doc.song(), before);
+    EXPECT_FALSE(doc.can_undo()); // One step.
+    doc.redo();
+    EXPECT_EQ(cell_at(doc, 1, 3).effect, 0);
+}
+
+TEST(
+    Edit,
+    CutWithoutASelectionTakesTheCursorCell)
+{
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 5, 2, Column::Note));
+    const Clip clip = doc.cut();
+    EXPECT_EQ(clip.rows[0][0], numbered(2, 5));
+    EXPECT_TRUE(cell_at(doc, 2, 5).empty());
+    EXPECT_EQ(doc.cursor(), at(0, 5, 2, Column::Note)); // Unlike clear(), it stays.
+}
+
+TEST(
+    Edit,
+    ClearEmptiesTheSelection)
+{
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 0, 3, Column::Effect));
+    doc.move_rows(63, true);
+    doc.clear();
+    for (std::size_t row = 0; row < kRowsPerPattern; ++row) {
+        EXPECT_EQ(cell_at(doc, 3, row), (Cell {numbered(3, row).note, 4, 0, 0}));
+    }
+    EXPECT_EQ(cell_at(doc, 2, 0), numbered(2, 0));
+    EXPECT_EQ(doc.cursor(), at(0, 63, 3, Column::Effect));
+    EXPECT_NE(doc.selection(), std::nullopt);
+    doc.undo();
+    EXPECT_EQ(cell_at(doc, 3, 0), numbered(3, 0));
+    EXPECT_FALSE(doc.can_undo());
+}
+
+// --- Paste ---
+
+TEST(
+    Edit,
+    PasteKeepsFieldKinds)
+{
+    Document source = numbered_document();
+    source.set_cursor(at(0, 0, 0, Column::Effect));
+    source.move_rows(1, true);
+    const Clip effects = source.copy();
+
+    Document doc; // Another song.
+    doc.set_cursor(at(0, 10, 2, Column::Note)); // An effect still goes to an effect field.
+    EXPECT_TRUE(doc.paste(effects));
+    EXPECT_EQ(cell_at(doc, 2, 10), (Cell {0, 0, 0xA, 0}));
+    EXPECT_EQ(cell_at(doc, 2, 11), (Cell {0, 0, 0xA, 1}));
+    EXPECT_TRUE(cell_at(doc, 2, 12).empty());
+    EXPECT_TRUE(cell_at(doc, 3, 10).empty());
+    EXPECT_EQ(
+        doc.selection(), (Selection {10, 11, field(2, Field::Effect), field(2, Field::Effect)}));
+    EXPECT_EQ(doc.cursor(), at(0, 10, 2, Column::Note));
+}
+
+TEST(
+    Edit,
+    PasteOnlyWritesTheClipFields)
+{
+    Document source = numbered_document();
+    source.set_cursor(at(0, 0, 0, Column::Instrument));
+    source.set_cursor(at(0, 0, 1, Column::Note), true);
+    const Clip clip = source.copy(); // Channel 1's instrument and effect, channel 2's note.
+
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 9, 1, Column::Effect));
+    EXPECT_TRUE(doc.paste(clip));
+    const Cell from = numbered(0, 0);
+    EXPECT_EQ(cell_at(doc, 1, 9), (Cell {numbered(1, 9).note, from.instrument, 0xA, 0}));
+    EXPECT_EQ(cell_at(doc, 2, 9), (Cell {1, 3, 0xA, 9}));
+}
+
+TEST(
+    Edit,
+    PasteDropsWhatFallsOutside)
+{
+    Document source = numbered_document();
+    source.select_all();
+    const Clip all = source.copy();
+    EXPECT_EQ(all.rows.size(), kRowsPerPattern);
+    EXPECT_EQ(all.fields, kChannels * kFieldsPerCell);
+
+    Document doc;
+    doc.set_cursor(at(0, 60, 2, Column::Instrument));
+    EXPECT_TRUE(doc.paste(all));
+    for (std::size_t row = 0; row < 4; ++row) {
+        EXPECT_EQ(cell_at(doc, 2, 60 + row), numbered(0, row));
+        EXPECT_EQ(cell_at(doc, 3, 60 + row), numbered(1, row));
+    }
+    EXPECT_TRUE(cell_at(doc, 2, 59).empty());
+    EXPECT_TRUE(cell_at(doc, 1, 60).empty());
+    EXPECT_EQ(
+        doc.selection(),
+        (Selection {
+            60, kRowsPerPattern - 1, field(2, Field::Note), kChannels * kFieldsPerCell - 1}));
+}
+
+TEST(
+    Edit,
+    PasteIsOneUndoStep)
+{
+    Document source = numbered_document();
+    source.select_all();
+    const Clip all = source.copy();
+    Document doc;
+    const Song before = doc.song();
+    doc.paste(all);
+    EXPECT_TRUE(doc.modified());
+    doc.undo();
+    EXPECT_EQ(doc.song(), before);
+    EXPECT_FALSE(doc.can_undo());
+    doc.redo();
+    EXPECT_EQ(doc.song().patterns, source.song().patterns);
+}
+
+TEST(
+    Edit,
+    PastingAnEmptyClipChangesNothing)
+{
+    Document doc;
+    EXPECT_TRUE(Clip {}.empty());
+    EXPECT_FALSE(doc.paste(Clip {}));
+    EXPECT_FALSE(doc.can_undo());
+    EXPECT_EQ(doc.selection(), std::nullopt);
+}
+
+// --- Transpose ---
+
+TEST(
+    Edit,
+    TransposeMovesTheSelectedNotes)
+{
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 0, 0, Column::Note));
+    doc.set_cursor(at(0, 3, 1, Column::Note), true);
+    EXPECT_TRUE(doc.transpose(12));
+    for (std::size_t row = 0; row <= 3; ++row) {
+        for (std::size_t channel = 0; channel <= 1; ++channel) {
+            Cell expected = numbered(channel, row);
+            expected.note = static_cast<std::uint8_t>(expected.note + 12);
+            EXPECT_EQ(cell_at(doc, channel, row), expected);
+        }
+    }
+    EXPECT_EQ(cell_at(doc, 0, 4), numbered(0, 4));
+    EXPECT_EQ(cell_at(doc, 2, 0), numbered(2, 0));
+    EXPECT_TRUE(doc.transpose(-11));
+    EXPECT_EQ(cell_at(doc, 1, 3).note, numbered(1, 3).note + 1);
+    doc.undo();
+    doc.undo();
+    EXPECT_EQ(doc.song(), numbered_document().song());
+    EXPECT_FALSE(doc.can_undo());
+}
+
+TEST(
+    Edit,
+    TransposeOnlyMovesNoteFields)
+{
+    Document doc = numbered_document();
+    doc.set_cursor(at(0, 0, 0, Column::Instrument));
+    doc.set_cursor(at(0, 3, 0, Column::Effect), true);
+    EXPECT_FALSE(doc.transpose(1));
+    EXPECT_FALSE(doc.can_undo());
+}
+
+TEST(
+    Edit,
+    TransposeLeavesEmptyNotes)
+{
+    Document doc;
+    doc.set_cursor(at(0, 2, 0, Column::Note));
+    doc.enter_note(kC4);
+    doc.set_cursor(at(0, 0, 0, Column::Note));
+    doc.move_rows(5, true);
+    EXPECT_TRUE(doc.transpose(2));
+    EXPECT_EQ(cell_at(doc, 0, 2).note, kC4 + 2);
+    EXPECT_EQ(cell_at(doc, 0, 1).note, kNoteNone);
+    EXPECT_EQ(cell_at(doc, 0, 3).note, kNoteNone);
+
+    doc.set_cursor(at(0, 10, 0, Column::Note));
+    doc.move_rows(5, true);
+    EXPECT_FALSE(doc.transpose(2)); // No note to move.
+}
+
+TEST(
+    Edit,
+    TransposeRefusesNotesOutOfRange)
+{
+    Document doc;
+    doc.enter_note(kLastNote);
+    doc.enter_note(kFirstNote);
+    const Song before = doc.song();
+    doc.set_cursor(at(0, 0, 0, Column::Note));
+    doc.move_rows(1, true);
+    EXPECT_FALSE(doc.transpose(1)); // B-7 cannot go up...
+    EXPECT_FALSE(doc.transpose(-1)); // ...nor C-2 down.
+    EXPECT_EQ(doc.song(), before);
+    doc.set_cursor(at(0, 0, 0, Column::Note));
+    EXPECT_TRUE(doc.transpose(-1)); // Without a selection: the cursor's note alone.
+    EXPECT_EQ(cell_at(doc, 0, 0).note, kLastNote - 1);
+    EXPECT_EQ(cell_at(doc, 0, 1).note, kFirstNote);
+}
+
+TEST(
+    Edit,
+    TransposeMovesASharedPatternOnce)
+{
+    Song song = Document().song();
+    song.orders = {{0, 0, 0, 0}};
+    song.patterns[0][0] = Cell {kC4, 1, 0, 0};
+    Document doc(song);
+    doc.select_all();
+    EXPECT_TRUE(doc.transpose(1));
+    EXPECT_EQ(doc.song().patterns[0][0].note, kC4 + 1);
 }
 
 // --- Note preview ---

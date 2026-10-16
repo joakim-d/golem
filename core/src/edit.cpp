@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string_view>
 
@@ -49,6 +50,45 @@ namespace {
         return static_cast<int>(cursor.channel) * kColumnsPerCell + static_cast<int>(cursor.column);
     }
 
+    constexpr std::size_t kFields = kChannels * kFieldsPerCell;
+
+    // Row and field (counted across channels) of the cursor, for the selection's ends.
+    std::pair<
+        std::size_t,
+        std::size_t>
+    position(const Cursor& cursor)
+    {
+        return {
+            cursor.row,
+            cursor.channel * kFieldsPerCell + static_cast<std::size_t>(field_of(cursor.column))};
+    }
+
+    void copy_field(
+        Cell& to,
+        const Cell& from,
+        Field field)
+    {
+        switch (field) {
+        case Field::Note:
+            to.note = from.note;
+            break;
+        case Field::Instrument:
+            to.instrument = from.instrument;
+            break;
+        case Field::Effect:
+            to.effect = from.effect;
+            to.param = from.param;
+            break;
+        }
+    }
+
+    void clear_field(
+        Cell& cell,
+        Field field)
+    {
+        copy_field(cell, Cell {}, field);
+    }
+
 } // namespace
 
 bool operator==(
@@ -56,6 +96,45 @@ bool operator==(
     const Cursor& b)
 {
     return a.order == b.order && a.row == b.row && a.channel == b.channel && a.column == b.column;
+}
+
+Field field_of(Column column)
+{
+    switch (column) {
+    case Column::Note:
+        return Field::Note;
+    case Column::Instrument:
+        return Field::Instrument;
+    case Column::Effect:
+    case Column::ParamHigh:
+    case Column::ParamLow:
+        break;
+    }
+    return Field::Effect;
+}
+
+bool Selection::contains(
+    std::size_t row,
+    std::size_t channel,
+    Column column) const
+{
+    const std::size_t field = channel * kFieldsPerCell + static_cast<std::size_t>(field_of(column));
+    return row >= first_row && row <= last_row && field >= first_field && field <= last_field;
+}
+
+bool operator==(
+    const Selection& a,
+    const Selection& b)
+{
+    return a.first_row == b.first_row
+        && a.last_row == b.last_row
+        && a.first_field == b.first_field
+        && a.last_field == b.last_field;
+}
+
+bool Clip::empty() const
+{
+    return fields == 0 || rows.empty();
 }
 
 std::optional<std::uint8_t> note_for_key(
@@ -212,39 +291,82 @@ void Document::set_instrument(std::uint8_t instrument)
     instrument_ = std::clamp<std::uint8_t>(instrument, 1, static_cast<std::uint8_t>(kInstruments));
 }
 
-void Document::move_rows(int delta)
+void Document::move_rows(
+    int delta,
+    bool select)
 {
+    Cursor cursor = cursor_;
     const int row =
-        std::clamp(static_cast<int>(cursor_.row) + delta, 0, static_cast<int>(kRowsPerPattern) - 1);
-    cursor_.row = static_cast<std::size_t>(row);
+        std::clamp(static_cast<int>(cursor.row) + delta, 0, static_cast<int>(kRowsPerPattern) - 1);
+    cursor.row = static_cast<std::size_t>(row);
+    move_to(cursor, select);
 }
 
-void Document::move_columns(int delta)
+void Document::move_columns(
+    int delta,
+    bool select)
 {
+    Cursor cursor = cursor_;
     const int last = static_cast<int>(kChannels) * kColumnsPerCell - 1;
-    const int index = std::clamp(column_index(cursor_) + delta, 0, last);
-    cursor_.channel = static_cast<std::size_t>(index / kColumnsPerCell);
-    cursor_.column = static_cast<Column>(index % kColumnsPerCell);
+    const int index = std::clamp(column_index(cursor) + delta, 0, last);
+    cursor.channel = static_cast<std::size_t>(index / kColumnsPerCell);
+    cursor.column = static_cast<Column>(index % kColumnsPerCell);
+    move_to(cursor, select);
 }
 
-void Document::move_channels(int delta)
+void Document::move_channels(
+    int delta,
+    bool select)
 {
+    Cursor cursor = cursor_;
     const int channel =
-        std::clamp(static_cast<int>(cursor_.channel) + delta, 0, static_cast<int>(kChannels) - 1);
-    cursor_.channel = static_cast<std::size_t>(channel);
+        std::clamp(static_cast<int>(cursor.channel) + delta, 0, static_cast<int>(kChannels) - 1);
+    cursor.channel = static_cast<std::size_t>(channel);
+    move_to(cursor, select);
 }
 
 void Document::set_order(std::size_t order)
 {
-    cursor_.order = std::min(order, song_.orders.size() - 1);
+    order = std::min(order, song_.orders.size() - 1);
+    if (order != cursor_.order) {
+        anchor_.reset();
+    }
+    cursor_.order = order;
 }
 
-void Document::set_cursor(const Cursor& cursor)
+void Document::set_cursor(
+    const Cursor& cursor,
+    bool select)
 {
-    cursor_.order = std::min(cursor.order, song_.orders.size() - 1);
-    cursor_.row = std::min(cursor.row, kRowsPerPattern - 1);
-    cursor_.channel = std::min(cursor.channel, kChannels - 1);
-    cursor_.column = cursor.column;
+    Cursor clamped;
+    clamped.order = std::min(cursor.order, song_.orders.size() - 1);
+    clamped.row = std::min(cursor.row, kRowsPerPattern - 1);
+    clamped.channel = std::min(cursor.channel, kChannels - 1);
+    clamped.column = cursor.column;
+    move_to(clamped, select);
+}
+
+std::optional<Selection> Document::selection() const
+{
+    if (!anchor_) {
+        return std::nullopt;
+    }
+    return Selection {
+        std::min(anchor_->first, end_.first),
+        std::max(anchor_->first, end_.first),
+        std::min(anchor_->second, end_.second),
+        std::max(anchor_->second, end_.second)};
+}
+
+void Document::select_all()
+{
+    anchor_ = std::make_pair(std::size_t {0}, std::size_t {0});
+    end_ = {kRowsPerPattern - 1, kFields - 1};
+}
+
+void Document::clear_selection()
+{
+    anchor_.reset();
 }
 
 bool Document::enter_key(char key)
@@ -307,6 +429,11 @@ void Document::enter_hex(std::uint8_t digit)
 
 void Document::clear()
 {
+    if (const auto selected = selection()) {
+        change();
+        clear_block(*selected);
+        return;
+    }
     change();
     Cell& cell = cell_at_cursor();
     switch (cursor_.column) {
@@ -327,12 +454,105 @@ void Document::clear()
     advance();
 }
 
+Clip Document::copy() const
+{
+    const Selection block = this->block();
+    const Order& order = song_.orders[cursor_.order];
+    const std::size_t first_channel = block.first_field / kFieldsPerCell;
+    Clip clip;
+    clip.first_field = static_cast<Field>(block.first_field % kFieldsPerCell);
+    clip.fields = block.last_field - block.first_field + 1;
+    for (std::size_t row = block.first_row; row <= block.last_row; ++row) {
+        std::vector<Cell> cells(block.last_field / kFieldsPerCell - first_channel + 1);
+        for (std::size_t field = block.first_field; field <= block.last_field; ++field) {
+            const std::size_t channel = field / kFieldsPerCell;
+            copy_field(
+                cells[channel - first_channel],
+                song_.patterns[order[channel]][row],
+                static_cast<Field>(field % kFieldsPerCell));
+        }
+        clip.rows.push_back(std::move(cells));
+    }
+    return clip;
+}
+
+Clip Document::cut()
+{
+    Clip clip = copy();
+    change();
+    clear_block(block());
+    return clip;
+}
+
+bool Document::paste(const Clip& clip)
+{
+    if (clip.empty()) {
+        return false;
+    }
+    change();
+    const Order& order = song_.orders[cursor_.order];
+    const std::size_t first = static_cast<std::size_t>(clip.first_field);
+    const std::size_t base = cursor_.channel * kFieldsPerCell + first;
+    std::size_t last_row = cursor_.row;
+    for (std::size_t i = 0; i < clip.rows.size() && cursor_.row + i < kRowsPerPattern; ++i) {
+        last_row = cursor_.row + i;
+        for (std::size_t f = 0; f < clip.fields && base + f < kFields; ++f) {
+            const std::size_t from_channel = (first + f) / kFieldsPerCell;
+            if (from_channel >= clip.rows[i].size()) {
+                break;
+            }
+            copy_field(
+                song_.patterns[order[(base + f) / kFieldsPerCell]][last_row],
+                clip.rows[i][from_channel],
+                static_cast<Field>((first + f) % kFieldsPerCell));
+        }
+    }
+    anchor_ = std::make_pair(cursor_.row, base);
+    end_ = {last_row, std::min(base + clip.fields, kFields) - 1};
+    return true;
+}
+
+bool Document::transpose(int semitones)
+{
+    // Each pattern cell once, even when channels share a pattern.
+    const Selection block = this->block();
+    const Order& order = song_.orders[cursor_.order];
+    std::set<std::pair<std::uint8_t, std::size_t>> notes; // Pattern and row.
+    for (std::size_t channel = 0; channel < kChannels; ++channel) {
+        const std::size_t field = channel * kFieldsPerCell + static_cast<std::size_t>(Field::Note);
+        if (field < block.first_field || field > block.last_field) {
+            continue;
+        }
+        for (std::size_t row = block.first_row; row <= block.last_row; ++row) {
+            const std::uint8_t note = song_.patterns[order[channel]][row].note;
+            if (note == kNoteNone) {
+                continue;
+            }
+            const int moved = note + semitones;
+            if (moved < kFirstNote || moved > kLastNote) {
+                return false;
+            }
+            notes.emplace(order[channel], row);
+        }
+    }
+    if (notes.empty()) {
+        return false;
+    }
+    change();
+    for (const auto& [pattern, row] : notes) {
+        std::uint8_t& note = song_.patterns[pattern][row].note;
+        note = static_cast<std::uint8_t>(note + semitones);
+    }
+    return true;
+}
+
 bool Document::insert_order()
 {
     if (song_.orders.size() >= kMaxOrders) {
         return false;
     }
     change();
+    anchor_.reset();
     const Order copy = song_.orders[cursor_.order];
     song_.orders.insert(
         song_.orders.begin() + static_cast<std::ptrdiff_t>(cursor_.order) + 1, copy);
@@ -346,6 +566,7 @@ bool Document::remove_order()
         return false;
     }
     change();
+    anchor_.reset();
     song_.orders.erase(song_.orders.begin() + static_cast<std::ptrdiff_t>(cursor_.order));
     cursor_.order = std::min(cursor_.order, song_.orders.size() - 1);
     return true;
@@ -467,6 +688,7 @@ void Document::undo()
     revision_ = previous.revision;
     undo_.pop_back();
     merging_.reset();
+    anchor_.reset();
 }
 
 void Document::redo()
@@ -481,6 +703,7 @@ void Document::redo()
     revision_ = next.revision;
     redo_.pop_back();
     merging_.reset();
+    anchor_.reset();
 }
 
 void Document::change()
@@ -512,6 +735,43 @@ Cell& Document::cell_at_cursor()
 void Document::advance()
 {
     move_rows(edit_step_);
+}
+
+void Document::move_to(
+    const Cursor& cursor,
+    bool select)
+{
+    const bool same_order = cursor.order == cursor_.order;
+    if (select && same_order) {
+        if (!anchor_) {
+            anchor_ = position(cursor_);
+        }
+        end_ = position(cursor);
+    } else {
+        anchor_.reset();
+    }
+    cursor_ = cursor;
+}
+
+void Document::clear_block(const Selection& block)
+{
+    const Order& order = song_.orders[cursor_.order];
+    for (std::size_t row = block.first_row; row <= block.last_row; ++row) {
+        for (std::size_t field = block.first_field; field <= block.last_field; ++field) {
+            clear_field(
+                song_.patterns[order[field / kFieldsPerCell]][row],
+                static_cast<Field>(field % kFieldsPerCell));
+        }
+    }
+}
+
+Selection Document::block() const
+{
+    if (const auto selected = selection()) {
+        return *selected;
+    }
+    const std::size_t first = cursor_.channel * kFieldsPerCell;
+    return Selection {cursor_.row, cursor_.row, first, first + kFieldsPerCell - 1};
 }
 
 } // namespace golem::edit

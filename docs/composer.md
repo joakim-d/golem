@@ -40,8 +40,14 @@ Playback needs a build with SameBoy (GCC or Clang) and RGBDS. Without them, the 
 | Page Up / Page Down | 16 rows up / down |
 | Home / End | First / last row |
 | Tab / Shift+Tab | Next / previous channel |
-| Delete / Backspace | Clear the field: note and instrument, instrument, or effect and parameter |
+| Delete / Backspace | Clear the field: note and instrument, instrument, or effect and parameter. With a selection: clear it |
 | Space | Play / Stop |
+| Shift + a move | Select (see [Selecting and the clipboard](#selecting-and-the-clipboard)) |
+| Ctrl+X / Ctrl+C / Ctrl+V | Cut / copy / paste |
+| Ctrl+A | Select the whole order |
+| Escape | Clear the selection |
+| Ctrl+Up / Ctrl+Down | Transpose a semitone up / down |
+| Ctrl+Shift+Up / Ctrl+Shift+Down | Transpose an octave up / down |
 
 **Notes** (in the note column) are played by key *position*, like a piano, on any keyboard layout. These are the positions of a US QWERTY keyboard:
 
@@ -58,6 +64,19 @@ You hear each note as you enter it: the driver plays it with the current instrum
 
 **Hex digits** (in the instrument and effect fields) are 0–9 on the number row or keypad, and A–F as letters.
 
+## Selecting and the clipboard
+
+Select a block of the pattern with Shift and the arrows, Page Up/Down or Home/End, by dragging the mouse, or by Shift+clicking where it should end. Ctrl+A selects the whole order. The selection is shaded in amber, and a move without Shift clears it, as do Escape and choosing another order.
+
+A selection counts three fields per channel: the note, the instrument, and the effect with its parameter, which always go together. It can start and end in any field, across channels.
+
+- **Copy** (Ctrl+C) and **Cut** (Ctrl+X) take the selection, or the cursor's whole cell when nothing is selected. Cut empties what it copies.
+- **Paste** (Ctrl+V) writes the block at the cursor's row and channel. Each field goes into a field of its own kind: copied effects land in the effect field, wherever the cursor is in the cell. What would fall past the last row or channel is left out. The pasted block is then selected, ready to transpose.
+- **Delete** clears the selected fields.
+- **Transpose** (Ctrl+Up/Down by a semitone, with Shift by an octave) moves the selected notes, or the cursor's note. If any note would go past C-2 or B-7, nothing moves, so chords and melodies keep their intervals.
+
+The clipboard is kept when you open another song or start a new one, so you can copy blocks between songs. The same actions are in the Edit menu. Each one is one undo step.
+
 ## Menus and shortcuts
 
 | Shortcut | Action |
@@ -69,7 +88,7 @@ You hear each note as you enter it: the driver plays it with the current instrum
 | Ctrl+Y or Ctrl+Shift+Z | Redo |
 | Ctrl+Q | Quit |
 
-On macOS, Cmd works like Ctrl. Undo and redo cover every change to the song, and put the cursor back where it was. The window title shows the file name, with `*` while there are unsaved changes. New, Open and Quit ask before discarding them.
+On macOS, Cmd works like Ctrl. Shortcut letters follow your keyboard layout (on AZERTY, Ctrl+A is the key labelled A). Undo and redo cover every change to the song, and put the cursor back where it was. The window title shows the file name, with `*` while there are unsaved changes. New, Open and Quit ask before discarding them.
 
 ## Exporting
 
@@ -119,4 +138,4 @@ The effect column takes the 16 effects of the [song format](song-format.md). The
 ## Not yet
 
 - Playing from the cursor, and hearing edits while the song plays (edits are heard on the next Play).
-- Selection and copy/paste.
+- Inserting and deleting rows.

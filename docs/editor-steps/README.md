@@ -10,6 +10,7 @@ The Golem editor is a desktop tracker (SDL3 and Dear ImGui) for writing songs in
 | [03](03-instrument-editors.md) | Instrument and wave editors: field codecs, wave tools, merged undo steps; Instruments and Waves tabs | `Edit.*` tests; manual checklist; [composer.md](../composer.md) section | In progress |
 | [04](04-play-feedback.md) | Play feedback: note preview, playing row, Follow | `Player.*`, `Edit.*`, `LivePlayer.*` tests; manual checklist; [composer.md](../composer.md) section | In progress |
 | [05](05-export.md) | Export: ROM, WAV and binary song | `Player.*`, `Export.*` tests; manual checklist; [composer.md](../composer.md) section | In progress |
+| [06](06-selection.md) | Selection, cut, copy and paste, transpose | `Edit.*` tests; manual checklist; [composer.md](../composer.md) section | In progress |
 
 Milestone 1 (edit, play, save) is steps 00–02.
 
@@ -22,5 +23,5 @@ Milestone 1 (edit, play, save) is steps 00–02.
 ## Later steps (outline)
 
 - Play from the cursor. This needs a driver entry point that starts at an order and row, so it goes oracle first.
-- Selection, copy and paste, transpose.
+- Inserting and deleting rows; mix paste, interpolation.
 - Live edits heard while the song plays.

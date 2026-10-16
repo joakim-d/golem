@@ -22,6 +22,12 @@ namespace {
     constexpr int kBeatRows = 4;
     constexpr Uint64 kMaxPreviewMs = 3000;
     const ImU32 kPlayingRowColor = IM_COL32(60, 140, 90, 110);
+    const ImVec4 kSelectionColor(
+        0.55F,
+        0.45F,
+        0.15F,
+        0.55F);
+    constexpr int kOctave = 12;
     constexpr float kSidePanelWidth = 310;
     constexpr float kWaveBarWidth = 8; // Wave canvas: one bar per sample...
     constexpr float kWaveStepHeight = 8; // ...and this much per value step.
@@ -347,70 +353,120 @@ bool App::handle_shortcut(const SDL_KeyboardEvent& key)
         return false;
     }
     const bool shift = (key.mod & SDL_KMOD_SHIFT) != 0;
-    switch (key.scancode) {
-    case SDL_SCANCODE_N:
+    // Shortcuts follow the layout's letters, as in other applications.
+    switch (key.key) {
+    case SDLK_N:
         request(Pending::New);
         return true;
-    case SDL_SCANCODE_O:
+    case SDLK_O:
         request(Pending::Open);
         return true;
-    case SDL_SCANCODE_S:
+    case SDLK_S:
         shift ? save_as() : save();
         return true;
-    case SDL_SCANCODE_Q:
+    case SDLK_Q:
         request(Pending::Quit);
+        return true;
+    case SDLK_Z:
+        shift ? doc_.redo() : doc_.undo();
+        scroll_to_cursor_ = true;
+        return true;
+    case SDLK_Y:
+        doc_.redo();
+        scroll_to_cursor_ = true;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool App::handle_pattern_command(const SDL_KeyboardEvent& key)
+{
+    const bool shift = (key.mod & SDL_KMOD_SHIFT) != 0;
+    switch (key.scancode) {
+    case SDL_SCANCODE_UP:
+        doc_.transpose(shift ? kOctave : 1);
+        return true;
+    case SDL_SCANCODE_DOWN:
+        doc_.transpose(shift ? -kOctave : -1);
         return true;
     default:
         break;
     }
-    // Undo and redo follow the layout's letters, as in other applications.
-    if (key.key == SDLK_Z) {
-        shift ? doc_.redo() : doc_.undo();
-        scroll_to_cursor_ = true;
+    switch (key.key) {
+    case SDLK_X:
+        cut();
         return true;
-    }
-    if (key.key == SDLK_Y) {
-        doc_.redo();
-        scroll_to_cursor_ = true;
+    case SDLK_C:
+        copy();
         return true;
+    case SDLK_V:
+        paste();
+        return true;
+    case SDLK_A:
+        doc_.select_all();
+        return true;
+    default:
+        return false;
     }
-    return false;
+}
+
+void App::cut()
+{
+    clip_ = doc_.cut();
+}
+
+void App::copy()
+{
+    clip_ = doc_.copy();
+}
+
+void App::paste()
+{
+    doc_.paste(clip_);
 }
 
 void App::handle_pattern_key(const SDL_KeyboardEvent& key)
 {
     scroll_to_cursor_ = true;
+    if (command_key(key.mod) && handle_pattern_command(key)) {
+        return;
+    }
+    const bool shift = (key.mod & SDL_KMOD_SHIFT) != 0; // Moves with Shift select.
     switch (key.scancode) {
     case SDL_SCANCODE_UP:
-        doc_.move_rows(-1);
+        doc_.move_rows(-1, shift);
         return;
     case SDL_SCANCODE_DOWN:
-        doc_.move_rows(1);
+        doc_.move_rows(1, shift);
         return;
     case SDL_SCANCODE_LEFT:
-        doc_.move_columns(-1);
+        doc_.move_columns(-1, shift);
         return;
     case SDL_SCANCODE_RIGHT:
-        doc_.move_columns(1);
+        doc_.move_columns(1, shift);
         return;
     case SDL_SCANCODE_PAGEUP:
-        doc_.move_rows(-kPageRows);
+        doc_.move_rows(-kPageRows, shift);
         return;
     case SDL_SCANCODE_PAGEDOWN:
-        doc_.move_rows(kPageRows);
+        doc_.move_rows(kPageRows, shift);
         return;
     case SDL_SCANCODE_HOME:
-        doc_.move_rows(-static_cast<int>(kRowsPerPattern));
+        doc_.move_rows(-static_cast<int>(kRowsPerPattern), shift);
         return;
     case SDL_SCANCODE_END:
-        doc_.move_rows(static_cast<int>(kRowsPerPattern));
+        doc_.move_rows(static_cast<int>(kRowsPerPattern), shift);
         return;
     case SDL_SCANCODE_TAB:
-        doc_.move_channels((key.mod & SDL_KMOD_SHIFT) != 0 ? -1 : 1);
+        doc_.move_channels(shift ? -1 : 1);
         return;
     case SDL_SCANCODE_DELETE:
     case SDL_SCANCODE_BACKSPACE:
         doc_.clear();
+        return;
+    case SDL_SCANCODE_ESCAPE:
+        doc_.clear_selection();
         return;
     case SDL_SCANCODE_SPACE:
         toggle_playback();
@@ -558,6 +614,36 @@ void App::draw_menu()
         }
         if (ImGui::MenuItem("Redo", "Ctrl+Y", false, doc_.can_redo())) {
             doc_.redo();
+        }
+        // Pattern blocks: the selection, or the cursor's cell.
+        ImGui::Separator();
+        if (ImGui::MenuItem("Cut", "Ctrl+X")) {
+            cut();
+        }
+        if (ImGui::MenuItem("Copy", "Ctrl+C")) {
+            copy();
+        }
+        if (ImGui::MenuItem("Paste", "Ctrl+V", false, !clip_.empty())) {
+            paste();
+        }
+        if (ImGui::MenuItem("Delete", "Del")) {
+            doc_.clear();
+        }
+        if (ImGui::MenuItem("Select All", "Ctrl+A")) {
+            doc_.select_all();
+        }
+        ImGui::Separator();
+        const std::pair<const char*, const char*> transpositions[] = {
+            {"Transpose Up", "Ctrl+Up"},
+            {"Transpose Down", "Ctrl+Down"},
+            {"Octave Up", "Ctrl+Shift+Up"},
+            {"Octave Down", "Ctrl+Shift+Down"},
+        };
+        const int semitones[] = {1, -1, kOctave, -kOctave};
+        for (int i = 0; i < 4; ++i) {
+            if (ImGui::MenuItem(transpositions[i].first, transpositions[i].second)) {
+                doc_.transpose(semitones[i]);
+            }
         }
         ImGui::EndMenu();
     }
@@ -924,6 +1010,10 @@ void App::draw_pattern()
     const auto& cursor = doc_.cursor();
     const auto& order = doc_.song().orders[cursor.order];
     const bool shows_playing_order = playing && playing->order == cursor.order;
+    const auto selection = doc_.selection();
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        selecting_ = false;
+    }
 
     if (ImGui::BeginTable("Rows", 1 + int(kChannels), ImGuiTableFlags_ScrollY)) {
         ImGui::TableSetupScrollFreeze(0, 1);
@@ -960,16 +1050,34 @@ void App::draw_pattern()
                 for (int c = 0; c < edit::kColumnsPerCell; ++c) {
                     const auto column = static_cast<edit::Column>(c);
                     const std::string text = field_text(cell, column);
-                    const bool selected =
+                    const bool at_cursor =
                         row == cursor.row && channel == cursor.channel && column == cursor.column;
+                    const bool in_selection =
+                        !at_cursor && selection && selection->contains(row, channel, column);
                     ImGui::PushID(int((row * kChannels + channel) * edit::kColumnsPerCell) + c);
                     if (c > 0) {
                         ImGui::SameLine(0, c == 1 || c == 2 ? 8.0F : 0.0F);
                     }
                     const ImVec2 size = ImGui::CalcTextSize(text.c_str());
-                    if (ImGui::Selectable(
-                            text.c_str(), selected, ImGuiSelectableFlags_None, size)) {
-                        doc_.set_cursor(edit::Cursor {cursor.order, row, channel, column});
+                    if (in_selection) {
+                        ImGui::PushStyleColor(ImGuiCol_Header, kSelectionColor);
+                    }
+                    ImGui::Selectable(
+                        text.c_str(), at_cursor || in_selection, ImGuiSelectableFlags_None, size);
+                    if (in_selection) {
+                        ImGui::PopStyleColor();
+                    }
+                    // A click puts the cursor here (Shift+click selects up to here); dragging
+                    // from it selects.
+                    const edit::Cursor here {cursor.order, row, channel, column};
+                    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                        doc_.set_cursor(here, ImGui::GetIO().KeyShift);
+                        selecting_ = true;
+                    } else if (
+                        selecting_
+                        && !at_cursor
+                        && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+                        doc_.set_cursor(here, true);
                     }
                     ImGui::PopID();
                 }

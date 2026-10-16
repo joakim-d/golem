@@ -91,6 +91,11 @@ private:
 
     bool handle_shortcut(const SDL_KeyboardEvent& key);
     void handle_pattern_key(const SDL_KeyboardEvent& key);
+    // Ctrl+key in the pattern: the clipboard, select all and transpose; false for other keys.
+    bool handle_pattern_command(const SDL_KeyboardEvent& key);
+    void cut();
+    void copy();
+    void paste();
 
     void draw_menu();
     void draw_toolbar();
@@ -118,6 +123,8 @@ private:
     std::optional<std::pair<std::size_t, std::size_t>> followed_row_; // Order and row.
     bool quit_ = false;
     bool pattern_focused_ = false;
+    bool selecting_ = false; // A mouse drag over the pattern is selecting.
+    edit::Clip clip_; // Kept through New and Open, to copy between songs.
     bool scroll_to_cursor_ = true;
     Pending pending_ = Pending::None;
     bool ask_unsaved_ = false;

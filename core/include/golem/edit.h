@@ -23,6 +23,19 @@ enum class Column {
 };
 
 constexpr int kColumnsPerCell = 5;
+
+// The fields a selection counts in a cell: the note, the instrument, and the effect with its
+// parameter (never half an effect). Fields are counted across channels: the field of channel c
+// is c * kFieldsPerCell + field.
+enum class Field {
+    Note,
+    Instrument,
+    Effect,
+};
+
+constexpr std::size_t kFieldsPerCell = 3;
+
+Field field_of(Column column); // ParamHigh and ParamLow belong to the effect.
 constexpr int kLowestOctave = 2;
 constexpr int kHighestOctave = 7;
 
@@ -36,6 +49,35 @@ struct Cursor {
 bool operator==(
     const Cursor& a,
     const Cursor& b);
+
+// A block of the cursor's order: rows first_row..last_row, and the fields first_field..
+// last_field counted across channels (both ends included).
+struct Selection {
+    std::size_t first_row = 0;
+    std::size_t last_row = 0;
+    std::size_t first_field = 0;
+    std::size_t last_field = 0;
+
+    bool contains(
+        std::size_t row,
+        std::size_t channel,
+        Column column) const;
+};
+
+bool operator==(
+    const Selection& a,
+    const Selection& b);
+
+// A copied block: `rows` holds, per row, the cells of the channels the block spans, of which
+// only the fields first_field..first_field + fields - 1 (counted from the block's first
+// channel) are part of it.
+struct Clip {
+    Field first_field = Field::Note;
+    std::size_t fields = 0;
+    std::vector<std::vector<Cell>> rows;
+
+    bool empty() const;
+};
 
 // Note of a tracker keyboard key (QWERTY): the lower row (z s x d ... /) plays from C of
 // `octave`, the upper row (q 2 w 3 ... p) from C of `octave` + 1. std::nullopt for any other
@@ -91,12 +133,28 @@ public:
     std::uint8_t instrument() const;
     void set_instrument(std::uint8_t instrument); // Clamped to 1..15.
 
-    // Cursor movement, clamped to the pattern and to the first/last column.
-    void move_rows(int delta);
-    void move_columns(int delta); // Crosses channels.
-    void move_channels(int delta); // Same column in the next/previous channel.
-    void set_order(std::size_t order); // Clamped to the orders; keeps row and column.
-    void set_cursor(const Cursor& cursor); // Each part clamped, e.g. for a mouse click.
+    // Cursor movement, clamped to the pattern and to the first/last column. With `select`,
+    // the selection goes from where the cursor was (unless one is already started) to where
+    // it is; without, the selection is cleared.
+    void move_rows(
+        int delta,
+        bool select = false);
+    void move_columns( // Crosses channels.
+        int delta,
+        bool select = false);
+    void move_channels( // Same column in the next/previous channel.
+        int delta,
+        bool select = false);
+    // Clamped to the orders; keeps row and column. Another order clears the selection.
+    void set_order(std::size_t order);
+    void set_cursor( // Each part clamped, e.g. for a mouse click.
+        const Cursor& cursor,
+        bool select = false);
+
+    // The selected block, if any (undo and redo clear it).
+    std::optional<Selection> selection() const;
+    void select_all(); // Every row and field of the order; the cursor stays.
+    void clear_selection();
 
     // Entry at the cursor. Each one is a change (undoable) and moves the cursor down by the
     // edit step. Returns false, changing nothing, when the key means nothing in this column.
@@ -104,7 +162,22 @@ public:
     void enter_note(std::uint8_t note); // Note and current instrument.
     void enter_note_off(); // No note, no instrument, effect C00.
     void enter_hex(std::uint8_t digit); // Instrument, effect code or parameter digit.
-    void clear(); // Note and instrument, instrument, or effect and parameter.
+    // Without a selection: clears the note and instrument, the instrument, or the effect and
+    // parameter, and moves down. With one: clears its fields, and the cursor stays.
+    void clear();
+
+    // Blocks: the selection, or the cursor's cell without one. Copy is not a change; the
+    // others are one each.
+    Clip copy() const;
+    Clip cut();
+    // Writes `clip` at the cursor's row and channel, starting at the clip's first field kind;
+    // what falls past the last row or channel is dropped. The pasted block becomes the
+    // selection. False, changing nothing, for an empty clip.
+    bool paste(const Clip& clip);
+    // Moves the block's notes by `semitones`, once per pattern cell even when a pattern is
+    // shared by several channels. False, changing nothing, if a note would leave C-2..B-7 or
+    // there is no note to move.
+    bool transpose(int semitones);
 
     // Orders and patterns. Each is a change; false when a limit forbids it.
     bool insert_order(); // A copy of the current order after it; the cursor moves to it.
@@ -162,6 +235,11 @@ private:
         std::uint8_t index);
     Cell& cell_at_cursor();
     void advance();
+    void move_to( // Moves the cursor, extending or clearing the selection.
+        const Cursor& cursor,
+        bool select);
+    Selection block() const; // The selection, or the cursor's cell.
+    void clear_block(const Selection& block); // Not a change by itself.
 
     Song song_;
     std::string path_;
@@ -175,6 +253,9 @@ private:
     std::vector<Snapshot> undo_;
     std::vector<Snapshot> redo_;
     std::optional<std::pair<Target, std::uint8_t>> merging_;
+    // Ends of the selection, in the cursor's order: rows and fields counted across channels.
+    std::optional<std::pair<std::size_t, std::size_t>> anchor_;
+    std::pair<std::size_t, std::size_t> end_;
 };
 
 } // namespace golem::edit
