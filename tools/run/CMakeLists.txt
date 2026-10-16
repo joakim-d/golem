@@ -4,6 +4,7 @@ target_link_libraries(golem_gb_core PRIVATE peanut_gb::peanut_gb)
 
 add_library(golem_run
   src/audio.cpp
+  src/export.cpp
   src/live_player.cpp
   src/rom_runner.cpp
   src/wav.cpp)
@@ -39,6 +40,7 @@ endif()
 if(BUILD_TESTING)
   add_executable(golem_run_tests
     tests/audio_test.cpp
+    tests/export_test.cpp
     tests/live_player_test.cpp
     tests/rom_runner_test.cpp
     tests/wav_test.cpp)

@@ -1414,3 +1414,55 @@ TEST(
             {1, 6, 3},
             {0, 0, 0}}));
 }
+
+// --- Song length ---
+
+TEST(
+    Player,
+    SongLengthCoversEveryOrder)
+{
+    EXPECT_EQ(
+        song_length(
+            make_song("ticks_per_row 01\norder 00 00 00 00\norder 00 00 00 00\npattern 00\n")),
+        128u);
+    EXPECT_EQ(song_length(make_song(on_channel(1, "", "03"))), 192u);
+}
+
+TEST(
+    Player,
+    SongLengthFollowsTempoChanges)
+{
+    // F02 on row 0: row 0 still lasts 1 tick, the 63 others 2.
+    EXPECT_EQ(song_length(make_song(on_channel(1, "00 --- . F02\n"))), 1u + 63 * 2);
+}
+
+TEST(
+    Player,
+    SongLengthFollowsPatternBreaks)
+{
+    // Order 0 plays row 0, then order 1 from row 05 to its end; then order 0 again.
+    const std::string song = "ticks_per_row 01\norder 01 00 00 00\norder 00 00 00 00\n"
+                             "pattern 00\npattern 01\n00 --- . D05\n";
+    EXPECT_EQ(song_length(make_song(song)), 1u + 59);
+}
+
+TEST(
+    Player,
+    SongLengthPlaysAnIntroOnce)
+{
+    // The last order jumps back to order 1: order 0 is an intro, then the loop is orders 1-2.
+    const std::string song = "ticks_per_row 01\n"
+                             "order 00 00 00 00\norder 00 00 00 00\norder 01 00 00 00\n"
+                             "pattern 00\npattern 01\n3F --- . B01\n";
+    EXPECT_EQ(song_length(make_song(song)), 3u * 64);
+}
+
+TEST(
+    Player,
+    SongLengthEndsAtAJumpBack)
+{
+    // B00 on row 1F of order 1: half of order 1 is played.
+    const std::string song = "ticks_per_row 01\norder 00 00 00 00\norder 01 00 00 00\n"
+                             "pattern 00\npattern 01\n1F --- . B00\n";
+    EXPECT_EQ(song_length(make_song(song)), 64u + 32);
+}

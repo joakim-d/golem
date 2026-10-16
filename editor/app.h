@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 
 namespace golem::editor {
 
@@ -17,6 +18,7 @@ namespace golem::editor {
 class App {
 public:
     explicit App(SDL_Window* window);
+    ~App(); // Waits for a WAV export in progress.
 
     // Opens a song; a failure is shown in the window.
     void open(const std::string& path);
@@ -47,6 +49,9 @@ private:
     enum class Dialog {
         Open,
         SaveAs,
+        ExportRom,
+        ExportWav,
+        ExportBinary,
     };
 
     enum class SideTab {
@@ -66,6 +71,11 @@ private:
     void run(Pending action);
     void save();
     void save_as();
+    // Writes the song to the file chosen in an export dialog.
+    void export_to(
+        Dialog dialog,
+        const std::string& path);
+    void finish_wav_export(); // Reports a background WAV export once it is done.
     void show_dialog(Dialog dialog);
     static void SDLCALL on_dialog(
         void* userdata,
@@ -94,6 +104,7 @@ private:
     void draw_wave_canvas();
     void draw_pattern();
     void draw_popups();
+    void draw_export_popups();
     void update_title();
 
     SDL_Window* window_;
@@ -111,6 +122,7 @@ private:
     Pending pending_ = Pending::None;
     bool ask_unsaved_ = false;
     std::string error_;
+    std::string notice_; // Shown once, e.g. where an export went.
     std::string title_;
     std::uint8_t ticks_edit_ = 6;
     bool ticks_editing_ = false;
@@ -122,6 +134,15 @@ private:
     char wave_hex_edit_[48] = {};
     bool wave_hex_editing_ = false;
     bool wave_hex_invalid_ = false;
+
+    // Export WAV: passes asked first, then the file; the WAV is rendered on a thread.
+    bool ask_wav_passes_ = false;
+    int wav_passes_ = 1;
+    std::uint32_t wav_pass_frames_ = 0; // song_length() when the passes were asked.
+    std::thread wav_export_;
+    std::atomic<bool> wav_export_done_ {false};
+    std::string wav_export_error_; // Written by the thread before wav_export_done_.
+    std::string wav_export_path_;
 
     // Results of SDL's file dialogs, which may arrive on another thread.
     std::mutex dialog_mutex_;

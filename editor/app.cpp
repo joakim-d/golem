@@ -2,7 +2,9 @@
 
 #include "keys.h"
 
+#include "golem/export.h"
 #include "golem/instrument_fields.h"
+#include "golem/player.h"
 #include "golem/song_text.h"
 
 #include <imgui.h>
@@ -28,6 +30,12 @@ namespace {
     const char* const kEnvelopeDirections[] = {"Down", "Up"};
     const char* const kLfsrWidths[] = {"15-bit (noise)", "7-bit (metallic)"};
     const SDL_DialogFileFilter kSongFilter = {"Golem songs", "gsong"};
+    const SDL_DialogFileFilter kRomFilter = {"Game Boy ROMs", "gb"};
+    const SDL_DialogFileFilter kWavFilter = {"WAV files", "wav"};
+    const SDL_DialogFileFilter kBinaryFilter = {"Binary songs", "bin"};
+    constexpr int kMaxWavPasses = 4;
+    constexpr double kMaxWavMinutes = 20;
+    constexpr double kFramesPerSecond = 4194304.0 / 70224;
 
     std::string hex(
         unsigned value,
@@ -69,6 +77,13 @@ namespace {
 App::App(SDL_Window* window)
     : window_(window)
 {
+}
+
+App::~App()
+{
+    if (wav_export_.joinable()) {
+        wav_export_.join();
+    }
 }
 
 void App::open(const std::string& path)
@@ -172,9 +187,80 @@ void App::show_dialog(Dialog dialog)
     // The answer comes back through on_dialog(); `this` outlives the window.
     if (dialog == Dialog::Open) {
         SDL_ShowOpenFileDialog(&App::on_dialog, this, window_, &kSongFilter, 1, nullptr, false);
+        return;
+    }
+    const SDL_DialogFileFilter* filter = &kSongFilter;
+    switch (dialog) {
+    case Dialog::ExportRom:
+        filter = &kRomFilter;
+        break;
+    case Dialog::ExportWav:
+        filter = &kWavFilter;
+        break;
+    case Dialog::ExportBinary:
+        filter = &kBinaryFilter;
+        break;
+    default:
+        break;
+    }
+    // The song's file with the dialog's extension, or "song" next to nothing.
+    std::filesystem::path location = doc_.path().empty() ? "song.gsong" : doc_.path();
+    location.replace_extension(std::string(".") + filter->pattern);
+    const std::string text = location.string();
+    SDL_ShowSaveFileDialog(&App::on_dialog, this, window_, filter, 1, text.c_str());
+}
+
+void App::export_to(
+    Dialog dialog,
+    const std::string& path)
+{
+    try {
+        switch (dialog) {
+        case Dialog::ExportRom:
+            export_rom(doc_.song(), path);
+            notice_ = "Exported the ROM to\n" + path;
+            break;
+        case Dialog::ExportBinary:
+            export_binary(doc_.song(), path);
+            notice_ = "Exported the binary song to\n" + path;
+            break;
+        case Dialog::ExportWav: {
+            // Rendering takes a while: a thread renders a copy of the song.
+            if (wav_export_.joinable()) {
+                wav_export_.join();
+            }
+            wav_export_path_ = path;
+            wav_export_error_.clear();
+            wav_export_done_ = false;
+            wav_export_ =
+                std::thread([this, song = doc_.song(), path, passes = unsigned(wav_passes_)] {
+                    try {
+                        export_wav(song, path, passes);
+                    } catch (const std::exception& e) {
+                        wav_export_error_ = e.what();
+                    }
+                    wav_export_done_ = true;
+                });
+            break;
+        }
+        default:
+            break;
+        }
+    } catch (const std::exception& e) {
+        fail(std::string("Cannot export:\n") + e.what());
+    }
+}
+
+void App::finish_wav_export()
+{
+    if (!wav_export_.joinable() || !wav_export_done_) {
+        return;
+    }
+    wav_export_.join();
+    if (wav_export_error_.empty()) {
+        notice_ = "Exported the WAV to\n" + wav_export_path_;
     } else {
-        const std::string location = doc_.path().empty() ? "song.gsong" : doc_.path();
-        SDL_ShowSaveFileDialog(&App::on_dialog, this, window_, &kSongFilter, 1, location.c_str());
+        fail("Cannot export:\n" + wav_export_error_);
     }
 }
 
@@ -367,6 +453,14 @@ void App::draw()
         }
         if (chosen && chosen->first == Dialog::Open) {
             open(chosen->second);
+        } else if (chosen && chosen->first != Dialog::SaveAs) {
+            std::filesystem::path path(chosen->second);
+            if (path.extension().empty()) {
+                path += chosen->first == Dialog::ExportRom
+                          ? ".gb"
+                          : (chosen->first == Dialog::ExportWav ? ".wav" : ".bin");
+            }
+            export_to(chosen->first, path.string());
         } else if (chosen) {
             std::filesystem::path path(chosen->second);
             if (path.extension().empty()) {
@@ -380,6 +474,7 @@ void App::draw()
         }
     }
 
+    finish_wav_export();
     if (preview_key_ && SDL_GetTicks() - preview_started_ > kMaxPreviewMs) {
         stop_preview();
     }
@@ -426,6 +521,31 @@ void App::draw_menu()
         if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
             save_as();
         }
+        ImGui::Separator();
+        const std::string unavailable = playback_unavailable_reason();
+        const auto unavailable_tooltip = [&unavailable] {
+            if (!unavailable.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("Needs playback, which is unavailable: %s", unavailable.c_str());
+            }
+        };
+        if (ImGui::MenuItem("Export ROM...", nullptr, false, unavailable.empty())) {
+            show_dialog(Dialog::ExportRom);
+        }
+        unavailable_tooltip();
+        if (ImGui::MenuItem(
+                "Export WAV...", nullptr, false, unavailable.empty() && !wav_export_.joinable())) {
+            try {
+                wav_pass_frames_ = song_length(doc_.song());
+                ask_wav_passes_ = true;
+            } catch (const std::exception& e) {
+                fail(std::string("Cannot export:\n") + e.what());
+            }
+        }
+        unavailable_tooltip();
+        if (ImGui::MenuItem("Export Binary Song...")) {
+            show_dialog(Dialog::ExportBinary);
+        }
+        ImGui::SetItemTooltip("The song as the driver reads it, at $4000");
         ImGui::Separator();
         if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
             request(Pending::Quit);
@@ -860,8 +980,69 @@ void App::draw_pattern()
     ImGui::EndChild();
 }
 
+void App::draw_export_popups()
+{
+    if (ask_wav_passes_) {
+        ImGui::OpenPopup("Export WAV");
+        ask_wav_passes_ = false;
+    }
+    if (ImGui::BeginPopupModal("Export WAV", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SetNextItemWidth(120);
+        ImGui::SliderInt("Passes", &wav_passes_, 1, kMaxWavPasses);
+        const double seconds =
+            (double(wav_passes_) * wav_pass_frames_ + kExportTailFrames) / kFramesPerSecond;
+        const int whole = static_cast<int>(seconds + 0.5);
+        ImGui::Text(
+            "Length: %d:%02d (a pass is %.1f s, then a 2 s tail)",
+            whole / 60,
+            whole % 60,
+            wav_pass_frames_ / kFramesPerSecond);
+        const bool too_long = seconds > kMaxWavMinutes * 60;
+        if (too_long) {
+            ImGui::TextColored(
+                ImVec4(1, 0.4F, 0.4F, 1), "Longer than %.0f minutes", kMaxWavMinutes);
+        }
+        ImGui::BeginDisabled(too_long);
+        if (ImGui::Button("Export...")) {
+            ImGui::CloseCurrentPopup();
+            show_dialog(Dialog::ExportWav);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (wav_export_.joinable()) {
+        ImGui::OpenPopup("Exporting");
+    }
+    if (ImGui::BeginPopupModal("Exporting", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text(
+            "Rendering %s...", std::filesystem::path(wav_export_path_).filename().string().c_str());
+        if (!wav_export_.joinable()) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (!notice_.empty()) {
+        ImGui::OpenPopup("Done");
+    }
+    if (ImGui::BeginPopupModal("Done", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(notice_.c_str());
+        if (ImGui::Button("OK")) {
+            notice_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
 void App::draw_popups()
 {
+    draw_export_popups();
     if (ask_unsaved_) {
         ImGui::OpenPopup("Unsaved changes");
         ask_unsaved_ = false;
